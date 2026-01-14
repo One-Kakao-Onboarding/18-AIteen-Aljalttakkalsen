@@ -1,0 +1,115 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useRef, useEffect } from "react"
+import { Send, ChevronLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+interface Message {
+  id: string
+  text: string
+  sender: "me" | "other"
+  timestamp: Date
+  read: boolean
+}
+
+interface ChatScreenProps {
+  messages: Message[]
+  onSendMessage: (text: string) => void
+  isMe: boolean
+  onBack?: () => void
+  showBackButton?: boolean
+}
+
+export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButton }: ChatScreenProps) {
+  const [inputValue, setInputValue] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (inputValue.trim()) {
+      onSendMessage(inputValue.trim())
+      setInputValue("")
+    }
+  }
+
+  // 자동 스크롤
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // 메시지 시간 포맷
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-chat-bg">
+      {/* 헤더 */}
+      <div className="bg-chat-header px-4 py-3 flex items-center gap-3 border-b border-border">
+        {showBackButton && (
+          <button onClick={onBack} className="p-1 -ml-2 hover:bg-muted rounded-full transition-colors">
+            <ChevronLeft className="w-5 h-5 text-foreground" />
+          </button>
+        )}
+        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+          <span className="text-xs">👤</span>
+        </div>
+        <span className="font-medium text-sm text-foreground">{isMe ? "나" : "상대방"}</span>
+      </div>
+
+      {/* 메시지 영역 */}
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-chat-bg">
+        {messages.length === 0 && (
+          <div className="text-center text-muted-foreground text-xs mt-8">메시지를 보내보세요</div>
+        )}
+        {messages.map((message) => {
+          const isMine = (isMe && message.sender === "me") || (!isMe && message.sender === "other")
+          return (
+            <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+              <div className={`flex items-end gap-1 max-w-[80%] ${isMine ? "flex-row-reverse" : ""}`}>
+                <div
+                  className={`px-3 py-2 rounded-2xl text-sm ${
+                    isMine
+                      ? "bg-chat-bubble-me text-chat-bubble-me-foreground rounded-tr-sm"
+                      : "bg-chat-bubble-other text-chat-bubble-other-foreground rounded-tl-sm"
+                  }`}
+                >
+                  {message.text}
+                </div>
+                <div className="flex flex-col items-end gap-0.5">
+                  {!isMe && message.sender === "other" && !message.read && (
+                    <span className="text-[10px] text-unread font-bold">1</span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{formatTime(message.timestamp)}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* 입력 영역 */}
+      <form onSubmit={handleSubmit} className="p-2 bg-card border-t border-border">
+        <div className="flex gap-2">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="메시지를 입력하세요"
+            className="flex-1 text-sm h-9 bg-muted border-0"
+          />
+          <Button type="submit" size="sm" className="h-9 w-9 p-0 bg-primary hover:bg-primary/90">
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
