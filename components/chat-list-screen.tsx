@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { MessageCircle, Bell, BellOff } from "lucide-react"
+import { MessageCircle, Bell, BellOff, Settings } from "lucide-react"
 
 interface ChatRoom {
   id: string
@@ -11,6 +11,7 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
+  notificationCondition?: string
 }
 
 interface ChatListScreenProps {
@@ -19,9 +20,10 @@ interface ChatListScreenProps {
   lastMessageFromMe?: string
   chatRooms: ChatRoom[]
   onToggleNotification: (chatId: string) => void
+  onNotificationSettings: (chatId: string) => void
 }
 
-export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, chatRooms, onToggleNotification }: ChatListScreenProps) {
+export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, chatRooms, onToggleNotification, onNotificationSettings }: ChatListScreenProps) {
   const [contextMenu, setContextMenu] = useState<{ chatId: string; x: number; y: number } | null>(null)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
   const longPressTriggeredRef = useRef(false)
@@ -68,6 +70,11 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
     setContextMenu(null)
   }
 
+  const handleNotificationSettings = (chatId: string) => {
+    onNotificationSettings(chatId)
+    setContextMenu(null)
+  }
+
   const handleCloseContextMenu = () => {
     setContextMenu(null)
   }
@@ -107,11 +114,19 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
                   {!room.notificationEnabled && (
                     <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   )}
+                  {room.notificationCondition && (
+                    <Settings className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                  )}
                 </div>
                 <span className="text-[10px] text-muted-foreground flex-shrink-0">{room.time}</span>
               </div>
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-xs text-muted-foreground truncate">{room.lastMessage}</span>
+                <div className="flex-1 min-w-0">
+                  {room.notificationCondition && (
+                    <p className="text-[10px] text-blue-500 truncate mb-0.5">조건: {room.notificationCondition}</p>
+                  )}
+                  <span className="text-xs text-muted-foreground truncate">{room.lastMessage}</span>
+                </div>
                 {room.unreadCount > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 bg-unread text-white text-[10px] font-bold rounded-full min-w-[18px] text-center flex-shrink-0">
                     {room.unreadCount > 99 ? "99+" : room.unreadCount}
@@ -152,6 +167,13 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
                 <span>알림 켜기</span>
               </button>
             )}
+            <button
+              onClick={() => handleNotificationSettings(contextMenu.chatId)}
+              className="w-full px-4 py-2 flex items-center gap-2 hover:bg-muted/50 transition-colors text-left text-sm border-t border-border/50"
+            >
+              <Settings className="w-4 h-4" />
+              <span>알림 조건 설정하기</span>
+            </button>
           </div>
         </>
       )}
