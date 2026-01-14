@@ -32,7 +32,7 @@ export function ChatDemo() {
   const [messages, setMessages] = useState<Message[]>([])
   const [rightPhoneScreen, setRightPhoneScreen] = useState<RightPhoneScreen>("off")
   const [showNotification, setShowNotification] = useState(false)
-  const [pendingNotification, setPendingNotification] = useState<Message | null>(null)
+  const [notificationMessage, setNotificationMessage] = useState<string>("")
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [showConditionModal, setShowConditionModal] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
@@ -144,8 +144,11 @@ export function ChatDemo() {
   }
 
   // 조건 매칭 확인 함수 (LLM 사용)
-  const checkConditionMatch = async (message: string, condition?: string): Promise<boolean> => {
-    if (!condition) return true // 조건이 없으면 항상 알림
+  const checkConditionMatch = async (
+    message: string,
+    condition?: string
+  ): Promise<{ shouldNotify: boolean; topic: string }> => {
+    if (!condition) return { shouldNotify: true, topic: "" } // 조건이 없으면 항상 알림
 
     try {
       const response = await fetch("/api/check-notification", {
@@ -158,14 +161,14 @@ export function ChatDemo() {
 
       if (!response.ok) {
         console.error("Failed to check notification condition")
-        return true // API 실패 시 기본적으로 알림 허용
+        return { shouldNotify: true, topic: "" } // API 실패 시 기본적으로 알림 허용
       }
 
       const data = await response.json()
-      return data.shouldNotify
+      return { shouldNotify: data.shouldNotify, topic: data.topic || "" }
     } catch (error) {
       console.error("Error checking notification condition:", error)
-      return true // 에러 시 기본적으로 알림 허용
+      return { shouldNotify: true, topic: "" } // 에러 시 기본적으로 알림 허용
     }
   }
 
@@ -235,10 +238,20 @@ export function ChatDemo() {
     // 알림이 켜져 있는지 확인
     if (mainChatRoom?.notificationEnabled) {
       // LLM으로 조건 체크
-      const shouldNotify = await checkConditionMatch(text, mainChatRoom.notificationCondition)
+      const { shouldNotify, topic } = await checkConditionMatch(text, mainChatRoom.notificationCondition)
 
       if (shouldNotify) {
-        setPendingNotification(newMessage)
+        // 알림 메시지 생성
+        let notifText = ""
+        if (mainChatRoom.notificationCondition && topic) {
+          // 조건이 있고 주제가 추출된 경우
+          notifText = `${topic} 관련 이야기가 나오고 있어요!`
+        } else {
+          // 조건이 없는 경우 (일반 알림)
+          notifText = text
+        }
+
+        setNotificationMessage(notifText)
         setShowNotification(true)
 
         // 알림음 재생
@@ -336,8 +349,8 @@ export function ChatDemo() {
       case "off":
         return (
           <LockScreen onClick={handleLockScreenClick}>
-            {showNotification && pendingNotification && (
-              <NotificationBanner message={pendingNotification.text} onClick={handleNotificationClick} />
+            {showNotification && notificationMessage && (
+              <NotificationBanner message={notificationMessage} onClick={handleNotificationClick} />
             )}
           </LockScreen>
         )

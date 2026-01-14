@@ -16,27 +16,33 @@ export async function POST(request: NextRequest) {
 
     console.log("Calling Gemini API with message:", message, "and condition:", condition)
 
-    // Gemini API 호출 (gemini-2.5-flash: 2025년 6월 출시 안정 버전)
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+    // Gemini API 호출 (gemini-2.0-flash-001: thinking 없어서 빠르고 효율적)
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`
 
     const requestBody = {
       contents: [
         {
           parts: [
             {
-              text: `사용자가 설정한 알림 조건과 받은 메시지를 분석해서, 메시지가 조건에 해당하는지 판단해주세요.
+              text: `사용자가 설정한 알림 조건과 받은 메시지를 분석해주세요.
 
 알림 조건: "${condition}"
 받은 메시지: "${message}"
 
-이 메시지가 알림 조건에 해당하나요? 반드시 "YES" 또는 "NO"로만 답변해주세요.`,
+이 메시지가 알림 조건에 해당하는지 판단하고, 해당한다면 조건의 핵심 주제를 간단히 추출해주세요.
+
+응답 형식:
+- 해당함: "YES|주제" (예: "YES|돈", "YES|여행 예약")
+- 해당 안함: "NO"
+
+반드시 위 형식으로만 답변해주세요.`,
             },
           ],
         },
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 10,
+        maxOutputTokens: 100,
       },
     }
 
@@ -65,13 +71,28 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     console.log("Gemini API response:", JSON.stringify(data, null, 2))
 
-    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase()
+    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
     console.log("Extracted result:", result)
 
-    const shouldNotify = result?.includes("YES")
-    console.log("Should notify:", shouldNotify)
+    // "YES|주제" 또는 "NO" 형식 파싱
+    let shouldNotify = false
+    let topic = ""
 
-    return NextResponse.json({ shouldNotify })
+    if (result) {
+      const upperResult = result.toUpperCase()
+      if (upperResult.includes("YES")) {
+        shouldNotify = true
+        // "|" 로 분리해서 주제 추출
+        const parts = result.split("|")
+        if (parts.length > 1) {
+          topic = parts[1].trim()
+        }
+      }
+    }
+
+    console.log("Should notify:", shouldNotify, "Topic:", topic)
+
+    return NextResponse.json({ shouldNotify, topic })
   } catch (error) {
     console.error("Error in check-notification API:", error)
     return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
