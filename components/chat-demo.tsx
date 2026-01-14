@@ -15,6 +15,16 @@ interface Message {
   read: boolean
 }
 
+interface ChatRoom {
+  id: string
+  name: string
+  lastMessage: string
+  unreadCount: number
+  avatar: string
+  time: string
+  notificationEnabled: boolean
+}
+
 type RightPhoneScreen = "off" | "list" | "chat"
 
 export function ChatDemo() {
@@ -22,10 +32,114 @@ export function ChatDemo() {
   const [rightPhoneScreen, setRightPhoneScreen] = useState<RightPhoneScreen>("off")
   const [showNotification, setShowNotification] = useState(false)
   const [pendingNotification, setPendingNotification] = useState<Message | null>(null)
-  const screenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
+    {
+      id: "main",
+      name: "상대방",
+      lastMessage: "메시지를 보내보세요",
+      unreadCount: 0,
+      avatar: "👤",
+      time: "방금",
+      notificationEnabled: true,
+    },
+    {
+      id: "group1",
+      name: "가족방",
+      lastMessage: "저녁 뭐 먹을까요?",
+      unreadCount: 23,
+      avatar: "👨‍👩‍👧‍👦",
+      time: "오후 2:30",
+      notificationEnabled: true,
+    },
+    {
+      id: "friend1",
+      name: "김철수",
+      lastMessage: "내일 시간 돼?",
+      unreadCount: 3,
+      avatar: "🧑",
+      time: "오후 1:15",
+      notificationEnabled: true,
+    },
+    {
+      id: "group2",
+      name: "회사 동료들",
+      lastMessage: "회의 시간 변경됐습니다",
+      unreadCount: 47,
+      avatar: "💼",
+      time: "오전 11:00",
+      notificationEnabled: true,
+    },
+    {
+      id: "friend2",
+      name: "박영희",
+      lastMessage: "사진 보내줘~",
+      unreadCount: 0,
+      avatar: "👩",
+      time: "어제",
+      notificationEnabled: true,
+    },
+    {
+      id: "friend3",
+      name: "이민수",
+      lastMessage: "ㅋㅋㅋㅋㅋ",
+      unreadCount: 12,
+      avatar: "🧔",
+      time: "어제",
+      notificationEnabled: true,
+    },
+  ])
 
   const unreadCount = messages.filter((msg) => msg.sender === "other" && !msg.read).length
   const lastMessage = messages.length > 0 ? messages[messages.length - 1].text : undefined
+  const mainChatRoom = chatRooms.find((room) => room.id === "main")
+
+  // 알림 토글 핸들러
+  const handleToggleNotification = (chatId: string) => {
+    setChatRooms((prev) =>
+      prev.map((room) => (room.id === chatId ? { ...room, notificationEnabled: !room.notificationEnabled } : room))
+    )
+  }
+
+  // 알림음 재생 함수
+  const playNotificationSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      // 알림음 설정 (두 번의 짧은 비프음)
+      oscillator.frequency.value = 800
+      oscillator.type = "sine"
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.1)
+
+      // 두 번째 비프음
+      const oscillator2 = audioContext.createOscillator()
+      const gainNode2 = audioContext.createGain()
+
+      oscillator2.connect(gainNode2)
+      gainNode2.connect(audioContext.destination)
+
+      oscillator2.frequency.value = 1000
+      oscillator2.type = "sine"
+
+      gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime + 0.15)
+      gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25)
+
+      oscillator2.start(audioContext.currentTime + 0.15)
+      oscillator2.stop(audioContext.currentTime + 0.25)
+    } catch (error) {
+      console.error("알림음 재생 실패:", error)
+    }
+  }
 
   const sendMessage = (text: string) => {
     const newMessage: Message = {
@@ -36,8 +150,38 @@ export function ChatDemo() {
       read: false,
     }
     setMessages((prev) => [...prev, newMessage])
-    setPendingNotification(newMessage)
-    setShowNotification(true)
+
+    // chatRooms의 main 채팅방 업데이트
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.id === "main"
+          ? {
+              ...room,
+              lastMessage: text,
+              unreadCount: messages.filter((msg) => msg.sender === "other" && !msg.read).length + 1,
+            }
+          : room
+      )
+    )
+
+    // 알림이 켜져 있을 때만 알림 표시
+    if (mainChatRoom?.notificationEnabled) {
+      setPendingNotification(newMessage)
+      setShowNotification(true)
+
+      // 알림음 재생
+      playNotificationSound()
+
+      // 기존 타이머가 있으면 제거
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current)
+      }
+
+      // 4초 후 알림 자동 숨김
+      notificationTimeoutRef.current = setTimeout(() => {
+        setShowNotification(false)
+      }, 4000)
+    }
   }
 
   const sendReply = (text: string) => {
@@ -49,7 +193,20 @@ export function ChatDemo() {
       read: true,
     }
     setMessages((prev) => [...prev, newMessage])
-    resetScreenTimeout()
+  }
+
+  // 전원 버튼 핸들러
+  const handlePowerButton = () => {
+    if (rightPhoneScreen === "off") {
+      setRightPhoneScreen("list")
+    } else {
+      setRightPhoneScreen("off")
+      setShowNotification(false)
+      // 알림 타이머 정리
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current)
+      }
+    }
   }
 
   // 알림 클릭시 채팅방으로 이동
@@ -57,13 +214,17 @@ export function ChatDemo() {
     setShowNotification(false)
     setRightPhoneScreen("chat")
     setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
-    resetScreenTimeout()
+    // chatRooms의 unreadCount 초기화
+    setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
+    // 알림 타이머 정리
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current)
+    }
   }
 
   const handleLockScreenClick = () => {
     if (!showNotification) {
       setRightPhoneScreen("list")
-      resetScreenTimeout()
     }
   }
 
@@ -71,43 +232,28 @@ export function ChatDemo() {
     if (chatId === "main") {
       setRightPhoneScreen("chat")
       setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
+      // chatRooms의 unreadCount 초기화
+      setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
     }
-    resetScreenTimeout()
   }
 
   const handleBackToList = () => {
     setRightPhoneScreen("list")
-    resetScreenTimeout()
-  }
-
-  // 화면 자동 꺼짐 타이머
-  const resetScreenTimeout = () => {
-    if (screenTimeoutRef.current) {
-      clearTimeout(screenTimeoutRef.current)
-    }
-    screenTimeoutRef.current = setTimeout(() => {
-      setRightPhoneScreen("off")
-    }, 8000)
-  }
-
-  // 오른쪽 폰 활동시 타이머 리셋
-  const handleRightPhoneActivity = () => {
-    if (rightPhoneScreen !== "off") {
-      resetScreenTimeout()
-    }
   }
 
   useEffect(() => {
     if (rightPhoneScreen === "chat") {
       setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
+      // chatRooms의 unreadCount 초기화
+      setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
     }
   }, [rightPhoneScreen])
 
-  // 클린업
+  // 클린업: 알림 타이머 정리
   useEffect(() => {
     return () => {
-      if (screenTimeoutRef.current) {
-        clearTimeout(screenTimeoutRef.current)
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current)
       }
     }
   }, [])
@@ -124,13 +270,19 @@ export function ChatDemo() {
         )
       case "list":
         return (
-          <div onClick={handleRightPhoneActivity} className="h-full">
-            <ChatListScreen unreadFromMe={unreadCount} onSelectChat={handleSelectChat} lastMessageFromMe={lastMessage} />
+          <div className="h-full">
+            <ChatListScreen
+              unreadFromMe={unreadCount}
+              onSelectChat={handleSelectChat}
+              lastMessageFromMe={lastMessage}
+              chatRooms={chatRooms}
+              onToggleNotification={handleToggleNotification}
+            />
           </div>
         )
       case "chat":
         return (
-          <div onClick={handleRightPhoneActivity} className="h-full">
+          <div className="h-full">
             <ChatScreen
               messages={messages}
               onSendMessage={sendReply}
@@ -157,7 +309,7 @@ export function ChatDemo() {
 
         <div className="flex flex-col items-center gap-2">
           <span className="text-sm text-muted-foreground">나</span>
-          <PhoneMockup>{renderRightPhoneContent()}</PhoneMockup>
+          <PhoneMockup onPowerButtonClick={handlePowerButton}>{renderRightPhoneContent()}</PhoneMockup>
         </div>
       </div>
     </div>
