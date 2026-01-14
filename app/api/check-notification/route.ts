@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, condition } = await request.json()
+    const { message, condition, sensitivity = "medium" } = await request.json()
 
     if (!message || !condition) {
       return NextResponse.json({ error: "Message and condition are required" }, { status: 400 })
@@ -14,7 +14,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 })
     }
 
-    console.log("Calling Gemini API with message:", message, "and condition:", condition)
+    console.log("Calling Gemini API with message:", message, "condition:", condition, "sensitivity:", sensitivity)
+
+    // 민감도에 따른 판단 기준 설정
+    let sensitivityGuideline = ""
+    if (sensitivity === "high") {
+      sensitivityGuideline = "조금이라도 관련이 있으면 YES로 판단하세요. 매우 넓게 해석하세요."
+    } else if (sensitivity === "medium") {
+      sensitivityGuideline = "명확하게 관련이 있을 때만 YES로 판단하세요."
+    } else {
+      // low
+      sensitivityGuideline = "매우 직접적이고 확실하게 관련이 있을 때만 YES로 판단하세요. 엄격하게 판단하세요."
+    }
 
     // Gemini API 호출 (gemini-2.0-flash-001: thinking 없어서 빠르고 효율적)
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`
@@ -28,6 +39,8 @@ export async function POST(request: NextRequest) {
 
 알림 조건: "${condition}"
 받은 메시지: "${message}"
+
+판단 기준: ${sensitivityGuideline}
 
 이 메시지가 알림 조건에 해당하는지 판단하고, 해당한다면 조건의 핵심 주제를 간단히 추출해주세요.
 

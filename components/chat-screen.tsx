@@ -61,7 +61,7 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
           <span className="text-xs">👤</span>
         </div>
-        <span className="font-medium text-sm text-foreground">{isMe ? "나" : "상대방"}</span>
+        <span className="font-medium text-sm text-foreground">{isMe ? "상대방" : "주인공"}</span>
       </div>
 
       {/* 메시지 영역 */}

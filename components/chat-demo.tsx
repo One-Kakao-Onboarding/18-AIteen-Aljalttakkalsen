@@ -15,6 +15,8 @@ interface Message {
   read: boolean
 }
 
+type NotificationSensitivity = "high" | "medium" | "low"
+
 interface ChatRoom {
   id: string
   name: string
@@ -24,6 +26,7 @@ interface ChatRoom {
   time: string
   notificationEnabled: boolean
   notificationCondition?: string
+  notificationSensitivity: NotificationSensitivity
 }
 
 type RightPhoneScreen = "off" | "list" | "chat"
@@ -37,6 +40,7 @@ export function ChatDemo() {
   const [showConditionModal, setShowConditionModal] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
+  const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>("medium")
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
     {
       id: "main",
@@ -46,6 +50,7 @@ export function ChatDemo() {
       avatar: "👤",
       time: "방금",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
     {
       id: "group1",
@@ -55,6 +60,7 @@ export function ChatDemo() {
       avatar: "👨‍👩‍👧‍👦",
       time: "오후 2:30",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
     {
       id: "friend1",
@@ -64,6 +70,7 @@ export function ChatDemo() {
       avatar: "🧑",
       time: "오후 1:15",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
     {
       id: "group2",
@@ -73,6 +80,7 @@ export function ChatDemo() {
       avatar: "💼",
       time: "오전 11:00",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
     {
       id: "friend2",
@@ -82,6 +90,7 @@ export function ChatDemo() {
       avatar: "👩",
       time: "어제",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
     {
       id: "friend3",
@@ -91,6 +100,7 @@ export function ChatDemo() {
       avatar: "🧔",
       time: "어제",
       notificationEnabled: true,
+      notificationSensitivity: "medium",
     },
   ])
 
@@ -111,6 +121,7 @@ export function ChatDemo() {
     if (room) {
       setSelectedChatId(chatId)
       setConditionInput(room.notificationCondition || "")
+      setSensitivityInput(room.notificationSensitivity)
       setShowConditionModal(true)
     }
   }
@@ -121,13 +132,19 @@ export function ChatDemo() {
       setChatRooms((prev) =>
         prev.map((room) =>
           room.id === selectedChatId
-            ? { ...room, notificationCondition: conditionInput.trim() || undefined, notificationEnabled: true }
+            ? {
+                ...room,
+                notificationCondition: conditionInput.trim() || undefined,
+                notificationSensitivity: sensitivityInput,
+                notificationEnabled: true,
+              }
             : room
         )
       )
     }
     setShowConditionModal(false)
     setConditionInput("")
+    setSensitivityInput("medium")
     setSelectedChatId(null)
   }
 
@@ -146,7 +163,8 @@ export function ChatDemo() {
   // 조건 매칭 확인 함수 (LLM 사용)
   const checkConditionMatch = async (
     message: string,
-    condition?: string
+    condition?: string,
+    sensitivity: NotificationSensitivity = "medium"
   ): Promise<{ shouldNotify: boolean; topic: string }> => {
     if (!condition) return { shouldNotify: true, topic: "" } // 조건이 없으면 항상 알림
 
@@ -156,7 +174,7 @@ export function ChatDemo() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message, condition }),
+        body: JSON.stringify({ message, condition, sensitivity }),
       })
 
       if (!response.ok) {
@@ -243,8 +261,12 @@ export function ChatDemo() {
 
       console.log("Checking unread messages:", allUnreadText)
 
-      // LLM으로 조건 체크 (읽지 않은 메시지 전체)
-      const { shouldNotify, topic } = await checkConditionMatch(allUnreadText, mainChatRoom.notificationCondition)
+      // LLM으로 조건 체크 (읽지 않은 메시지 전체 + 민감도)
+      const { shouldNotify, topic } = await checkConditionMatch(
+        allUnreadText,
+        mainChatRoom.notificationCondition,
+        mainChatRoom.notificationSensitivity
+      )
 
       if (shouldNotify) {
         // 알림 메시지 생성
@@ -428,6 +450,47 @@ export function ChatDemo() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 AI가 메시지 내용을 분석하여 조건에 맞는 알림만 보내드립니다.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-foreground mb-2">반응 민감도</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSensitivityInput("high")}
+                  className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sensitivityInput === "high"
+                      ? "bg-blue-500 text-white"
+                      : "bg-muted text-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  높음
+                </button>
+                <button
+                  onClick={() => setSensitivityInput("medium")}
+                  className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sensitivityInput === "medium"
+                      ? "bg-blue-500 text-white"
+                      : "bg-muted text-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  중간
+                </button>
+                <button
+                  onClick={() => setSensitivityInput("low")}
+                  className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sensitivityInput === "low"
+                      ? "bg-blue-500 text-white"
+                      : "bg-muted text-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  낮음
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {sensitivityInput === "high" && "조금이라도 관련되면 알림"}
+                {sensitivityInput === "medium" && "명확하게 관련되면 알림"}
+                {sensitivityInput === "low" && "매우 직접적으로 관련될 때만 알림"}
               </p>
             </div>
 

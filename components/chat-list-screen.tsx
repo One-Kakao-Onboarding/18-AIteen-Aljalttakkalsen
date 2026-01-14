@@ -3,6 +3,8 @@
 import { useState, useRef } from "react"
 import { MessageCircle, Bell, BellOff, Settings } from "lucide-react"
 
+type NotificationSensitivity = "high" | "medium" | "low"
+
 interface ChatRoom {
   id: string
   name: string
@@ -12,6 +14,7 @@ interface ChatRoom {
   time: string
   notificationEnabled: boolean
   notificationCondition?: string
+  notificationSensitivity: NotificationSensitivity
 }
 
 interface ChatListScreenProps {
