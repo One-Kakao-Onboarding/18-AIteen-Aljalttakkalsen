@@ -237,8 +237,14 @@ export function ChatDemo() {
 
     // 알림이 켜져 있는지 확인
     if (mainChatRoom?.notificationEnabled) {
-      // LLM으로 조건 체크
-      const { shouldNotify, topic } = await checkConditionMatch(text, mainChatRoom.notificationCondition)
+      // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
+      const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
+      const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
+
+      console.log("Checking unread messages:", allUnreadText)
+
+      // LLM으로 조건 체크 (읽지 않은 메시지 전체)
+      const { shouldNotify, topic } = await checkConditionMatch(allUnreadText, mainChatRoom.notificationCondition)
 
       if (shouldNotify) {
         // 알림 메시지 생성
