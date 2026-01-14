@@ -17,7 +17,7 @@ interface Message {
 
 interface ChatScreenProps {
   messages: Message[]
-  onSendMessage: (text: string) => void
+  onSendMessage: (text: string) => void | Promise<void>
   isMe: boolean
   onBack?: () => void
   showBackButton?: boolean
@@ -28,10 +28,10 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (inputValue.trim()) {
-      onSendMessage(inputValue.trim())
+      await onSendMessage(inputValue.trim())
       setInputValue("")
     }
   }

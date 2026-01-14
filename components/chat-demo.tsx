@@ -143,18 +143,30 @@ export function ChatDemo() {
     setSelectedChatId(null)
   }
 
-  // 조건 매칭 확인 함수
-  const checkConditionMatch = (message: string, condition?: string): boolean => {
+  // 조건 매칭 확인 함수 (LLM 사용)
+  const checkConditionMatch = async (message: string, condition?: string): Promise<boolean> => {
     if (!condition) return true // 조건이 없으면 항상 알림
 
-    // 간단한 키워드 추출 및 매칭
-    const keywords = condition
-      .toLowerCase()
-      .split(/[\s,，]+/)
-      .filter((word) => word.length > 1)
+    try {
+      const response = await fetch("/api/check-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message, condition }),
+      })
 
-    const messageLower = message.toLowerCase()
-    return keywords.some((keyword) => messageLower.includes(keyword))
+      if (!response.ok) {
+        console.error("Failed to check notification condition")
+        return true // API 실패 시 기본적으로 알림 허용
+      }
+
+      const data = await response.json()
+      return data.shouldNotify
+    } catch (error) {
+      console.error("Error checking notification condition:", error)
+      return true // 에러 시 기본적으로 알림 허용
+    }
   }
 
   // 알림음 재생 함수
@@ -197,7 +209,7 @@ export function ChatDemo() {
     }
   }
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -220,23 +232,28 @@ export function ChatDemo() {
       )
     )
 
-    // 알림이 켜져 있고 조건에 맞을 때만 알림 표시
-    if (mainChatRoom?.notificationEnabled && checkConditionMatch(text, mainChatRoom.notificationCondition)) {
-      setPendingNotification(newMessage)
-      setShowNotification(true)
+    // 알림이 켜져 있는지 확인
+    if (mainChatRoom?.notificationEnabled) {
+      // LLM으로 조건 체크
+      const shouldNotify = await checkConditionMatch(text, mainChatRoom.notificationCondition)
 
-      // 알림음 재생
-      playNotificationSound()
+      if (shouldNotify) {
+        setPendingNotification(newMessage)
+        setShowNotification(true)
 
-      // 기존 타이머가 있으면 제거
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current)
+        // 알림음 재생
+        playNotificationSound()
+
+        // 기존 타이머가 있으면 제거
+        if (notificationTimeoutRef.current) {
+          clearTimeout(notificationTimeoutRef.current)
+        }
+
+        // 4초 후 알림 자동 숨김
+        notificationTimeoutRef.current = setTimeout(() => {
+          setShowNotification(false)
+        }, 4000)
       }
-
-      // 4초 후 알림 자동 숨김
-      notificationTimeoutRef.current = setTimeout(() => {
-        setShowNotification(false)
-      }, 4000)
     }
   }
 
@@ -390,7 +407,9 @@ export function ChatDemo() {
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
               />
-              <p className="text-xs text-muted-foreground mt-1">키워드가 포함된 메시지가 올 때 알림을 받습니다.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                AI가 메시지 내용을 분석하여 조건에 맞는 알림만 보내드립니다.
+              </p>
             </div>
 
             <div className="flex gap-2 justify-end">
