@@ -589,7 +589,7 @@ export function ChatDemo() {
                     />
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">등록한 관심사 키워드에 대한 알림을 받습니다.</p>
+                <p className="text-xs text-muted-foreground">등록된 관심사에 관련된 대화가 이루어지면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.</p>
               </div>
 
               {/* 알림 발생 민감도 */}
