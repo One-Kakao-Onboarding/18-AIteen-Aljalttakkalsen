@@ -18,6 +18,7 @@ interface Message {
 interface Notification {
   id: string
   message: string
+  chatName: string
   timestamp: Date
 }
 
@@ -301,6 +302,7 @@ export function ChatDemo() {
       const generalNotification: Notification = {
         id: Date.now().toString(),
         message: text,
+        chatName: mainChatRoom.name,
         timestamp: new Date(),
       }
 
@@ -370,6 +372,7 @@ export function ChatDemo() {
         const keywordNotification: Notification = {
           id: `${Date.now()}-keywords`,
           message: `${topicsText} 관련 이야기가 나오고 있어요!`,
+          chatName: mainChatRoom?.name || "메시지",
           timestamp: new Date(),
         }
 
@@ -491,6 +494,7 @@ export function ChatDemo() {
                 <NotificationBanner
                   key={notification.id}
                   message={notification.message}
+                  chatName={notification.chatName}
                   onClick={() => handleNotificationClick(notification.id)}
                 />
               ))}
