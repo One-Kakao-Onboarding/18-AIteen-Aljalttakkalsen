@@ -13,7 +13,9 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
+  simpleKeywordNotificationEnabled: boolean
   keywordNotificationEnabled: boolean
+  simpleKeywords: string[]
   notificationConditions: Array<{ id: string; condition: string }>
   notificationSensitivity: NotificationSensitivity
   notifiedTopics: string[]

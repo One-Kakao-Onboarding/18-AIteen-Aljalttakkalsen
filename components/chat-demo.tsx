@@ -33,8 +33,10 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
-  keywordNotificationEnabled: boolean
-  notificationConditions: Array<{ id: string; condition: string }>
+  simpleKeywordNotificationEnabled: boolean // 단순 키워드 알림
+  keywordNotificationEnabled: boolean // AI 기반 관심사 알림
+  simpleKeywords: string[] // 단순 문자열 일치 키워드
+  notificationConditions: Array<{ id: string; condition: string }> // AI 기반 키워드
   notificationSensitivity: NotificationSensitivity
   notifiedTopics: string[]
 }
@@ -47,14 +49,20 @@ export function ChatDemo() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const [isAddingIndividualCondition, setIsAddingIndividualCondition] = useState(false)
+  const [isAddingIndividualSimpleKeyword, setIsAddingIndividualSimpleKeyword] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
+  const [simpleKeywordInput, setSimpleKeywordInput] = useState("")
   const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>(60)
   const [isAddingGlobalCondition, setIsAddingGlobalCondition] = useState(false)
+  const [isAddingGlobalSimpleKeyword, setIsAddingGlobalSimpleKeyword] = useState(false)
   const [globalConditionInput, setGlobalConditionInput] = useState("")
+  const [globalSimpleKeywordInput, setGlobalSimpleKeywordInput] = useState("")
   const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>(60)
   const [globalConditions, setGlobalConditions] = useState<Array<{ id: string; condition: string }>>([])
+  const [globalSimpleKeywords, setGlobalSimpleKeywords] = useState<string[]>([])
   const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>(60)
+  const [globalSimpleKeywordNotificationEnabled, setGlobalSimpleKeywordNotificationEnabled] = useState(false)
   const [globalNotificationEnabled, setGlobalNotificationEnabled] = useState(false)
   const [globalAllNotificationEnabled, setGlobalAllNotificationEnabled] = useState(true)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
@@ -66,7 +74,9 @@ export function ChatDemo() {
       avatar: "👤",
       time: "방금",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -79,7 +89,9 @@ export function ChatDemo() {
       avatar: "👨‍👩‍👧‍👦",
       time: "오후 2:30",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -92,7 +104,9 @@ export function ChatDemo() {
       avatar: "🧑",
       time: "오후 1:15",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -105,7 +119,9 @@ export function ChatDemo() {
       avatar: "💼",
       time: "오전 11:00",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -118,7 +134,9 @@ export function ChatDemo() {
       avatar: "👩",
       time: "어제",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -131,7 +149,9 @@ export function ChatDemo() {
       avatar: "🧔",
       time: "어제",
       notificationEnabled: true,
+      simpleKeywordNotificationEnabled: false,
       keywordNotificationEnabled: false,
+      simpleKeywords: [],
       notificationConditions: [],
       notificationSensitivity: 60,
       notifiedTopics: [],
@@ -150,6 +170,14 @@ export function ChatDemo() {
   }
 
   // 키워드 알림 토글 핸들러
+  const handleToggleSimpleKeywordNotification = (chatId: string) => {
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.id === chatId ? { ...room, simpleKeywordNotificationEnabled: !room.simpleKeywordNotificationEnabled } : room
+      )
+    )
+  }
+
   const handleToggleKeywordNotification = (chatId: string) => {
     setChatRooms((prev) =>
       prev.map((room) =>
@@ -339,7 +367,67 @@ export function ChatDemo() {
       notificationTimeoutsRef.current.set(generalNotification.id, generalTimeoutId)
     }
 
-    // 2. 키워드 알림 (키워드 알림이 켜져있고 조건이 있으면 체크)
+    // 2-1. 단순 키워드 알림 체크 (메시지에 키워드가 포함되면 즉시 알림)
+    const simpleKeywordsToCheck: string[] = []
+
+    // 개별 설정의 단순 키워드
+    if (mainChatRoom?.simpleKeywordNotificationEnabled && mainChatRoom.simpleKeywords.length > 0) {
+      simpleKeywordsToCheck.push(...mainChatRoom.simpleKeywords)
+    }
+
+    // 전역 설정의 단순 키워드
+    if (globalSimpleKeywordNotificationEnabled && globalSimpleKeywords.length > 0) {
+      simpleKeywordsToCheck.push(...globalSimpleKeywords)
+    }
+
+    // 단순 키워드 체크
+    if (simpleKeywordsToCheck.length > 0) {
+      const matchedSimpleKeywords: string[] = []
+
+      for (const keyword of simpleKeywordsToCheck) {
+        // 메시지에 키워드가 포함되어 있는지 체크
+        if (text.includes(keyword)) {
+          // 이미 알림이 간 키워드인지 확인
+          const alreadyNotified = mainChatRoom?.notifiedTopics.includes(keyword)
+
+          if (!alreadyNotified) {
+            matchedSimpleKeywords.push(keyword)
+          }
+        }
+      }
+
+      // 매칭된 단순 키워드가 있으면 알림 표시
+      if (matchedSimpleKeywords.length > 0) {
+        const keywordsText = matchedSimpleKeywords.join(", ")
+        const simpleKeywordNotification: Notification = {
+          id: `${Date.now()}-simple-keywords`,
+          message: `${keywordsText} 관련 이야기가 나오고 있어요!`,
+          chatName: mainChatRoom?.name || "메시지",
+          timestamp: new Date(),
+          keyword: keywordsText,
+        }
+
+        setNotifications((prev) => [simpleKeywordNotification, ...prev])
+        playNotificationSound()
+
+        // 모든 키워드를 notifiedTopics에 추가
+        setChatRooms((prev) =>
+          prev.map((room) =>
+            room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, ...matchedSimpleKeywords] } : room
+          )
+        )
+
+        // 4초 후 알림 자동 제거
+        const timeoutId = setTimeout(() => {
+          setNotifications((prev) => prev.filter((n) => n.id !== simpleKeywordNotification.id))
+          notificationTimeoutsRef.current.delete(simpleKeywordNotification.id)
+        }, 4000)
+
+        notificationTimeoutsRef.current.set(simpleKeywordNotification.id, timeoutId)
+      }
+    }
+
+    // 2-2. AI 기반 키워드 알림 (키워드 알림이 켜져있고 조건이 있으면 체크)
     // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
     const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
     const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
@@ -574,11 +662,116 @@ export function ChatDemo() {
                 <p className="text-xs text-muted-foreground">이 채팅방의 메시지에 대한 알림을 받습니다.</p>
               </div>
 
-              {/* 키워드 알림 켜기/끄기 토글 */}
+              {/* 단순 키워드 알림 켜기/끄기 토글 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">관심사 알림 받기
+                  <span className="text-sm font-medium text-foreground">단순 키워드 알림 받기</span>
+                  <button
+                    onClick={() => handleToggleSimpleKeywordNotification(selectedChatId!)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      selectedRoom?.simpleKeywordNotificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        selectedRoom?.simpleKeywordNotificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">등록된 키워드가 메시지에 포함되면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.</p>
+              </div>
+
+              {/* 단순 키워드 알림 */}
+              <div className={`space-y-3 ${!selectedRoom?.simpleKeywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    단순 키워드 ({selectedRoom?.simpleKeywords.length || 0}/20)
                   </span>
+                  <button
+                    onClick={() => {
+                      setIsAddingIndividualSimpleKeyword(true)
+                      setSimpleKeywordInput("")
+                    }}
+                    className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                    disabled={isAddingIndividualSimpleKeyword || !selectedRoom?.simpleKeywordNotificationEnabled}
+                  >
+                    추가
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">메시지에 키워드가 포함되면 즉시 알림을 보냅니다.</p>
+
+                {/* 단순 키워드 목록 */}
+                <div className="space-y-2">
+                  {/* 입력 칸 (추가 버튼 클릭 시에만 표시) */}
+                  {isAddingIndividualSimpleKeyword && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg">
+                      <input
+                        type="text"
+                        value={simpleKeywordInput}
+                        onChange={(e) => setSimpleKeywordInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && simpleKeywordInput.trim()) {
+                            setChatRooms((prev) =>
+                              prev.map((r) =>
+                                r.id === selectedChatId
+                                  ? { ...r, simpleKeywords: [...r.simpleKeywords, simpleKeywordInput.trim()] }
+                                  : r
+                              )
+                            )
+                            setSimpleKeywordInput("")
+                            setIsAddingIndividualSimpleKeyword(false)
+                          }
+                        }}
+                        placeholder="예) 여행"
+                        className="flex-1 text-sm bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsAddingIndividualSimpleKeyword(false)
+                          setSimpleKeywordInput("")
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedRoom?.simpleKeywords.map((keyword, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg"
+                    >
+                      <span className="text-sm text-foreground">{keyword}</span>
+                      <button
+                        onClick={() => {
+                          setChatRooms((prev) =>
+                            prev.map((r) =>
+                              r.id === selectedChatId
+                                ? { ...r, simpleKeywords: r.simpleKeywords.filter((_, i) => i !== idx) }
+                                : r
+                            )
+                          )
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI 기반 관심사 알림 켜기/끄기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">AI 기반 관심사 알림 받기</span>
                   <button
                     onClick={() => handleToggleKeywordNotification(selectedChatId!)}
                     className={`relative w-12 h-6 rounded-full transition-colors ${
@@ -592,12 +785,15 @@ export function ChatDemo() {
                     />
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">등록된 관심사에 관련된 대화가 이루어지면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.</p>
+                <p className="text-xs text-muted-foreground">AI가 관심사와 메시지의 연관성을 판단하여 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.</p>
               </div>
 
-              {/* 알림 발생 민감도 */}
+              {/* AI 기반 관심사 알림 */}
               <div className={`space-y-2 ${!selectedRoom?.keywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
-                <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">AI 기반 관심사</span>
+                <p className="text-xs text-muted-foreground">AI가 메시지와 관심사의 연관성을 판단하여 알림을 보냅니다.</p>
+
+                <div className="flex items-center justify-between mt-4">
                   <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
                   <span className="text-xs font-bold text-foreground">{selectedRoom?.notificationSensitivity}%</span>
                 </div>
@@ -624,7 +820,7 @@ export function ChatDemo() {
                 </div>
               </div>
 
-              {/* 관심사 리스트 */}
+              {/* AI 관심사 리스트 */}
               <div className={`space-y-3 ${!selectedRoom?.keywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">
@@ -745,10 +941,104 @@ export function ChatDemo() {
                 </p>
               </div>
 
-              {/* 관심사 알림 이용하기 토글 */}
+              {/* 단순 키워드 알림 이용하기 토글 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">관심사 알림 이용하기</span>
+                  <span className="text-sm font-medium text-foreground">단순 키워드 알림 이용하기</span>
+                  <button
+                    onClick={() => setGlobalSimpleKeywordNotificationEnabled(!globalSimpleKeywordNotificationEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      globalSimpleKeywordNotificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        globalSimpleKeywordNotificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  등록된 키워드가 메시지에 포함되면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.
+                </p>
+              </div>
+
+              {/* 단순 키워드 알림 */}
+              <div className={`space-y-3 ${!globalSimpleKeywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">단순 키워드 ({globalSimpleKeywords.length}/20)</span>
+                  <button
+                    onClick={() => {
+                      setIsAddingGlobalSimpleKeyword(true)
+                      setGlobalSimpleKeywordInput("")
+                    }}
+                    className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                    disabled={isAddingGlobalSimpleKeyword || !globalSimpleKeywordNotificationEnabled}
+                  >
+                    추가
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">메시지에 키워드가 포함되면 즉시 알림을 보냅니다.</p>
+
+                {/* 단순 키워드 목록 */}
+                <div className="space-y-2">
+                  {/* 입력 칸 (추가 버튼 클릭 시에만 표시) */}
+                  {isAddingGlobalSimpleKeyword && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg">
+                      <input
+                        type="text"
+                        value={globalSimpleKeywordInput}
+                        onChange={(e) => setGlobalSimpleKeywordInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && globalSimpleKeywordInput.trim()) {
+                            setGlobalSimpleKeywords([...globalSimpleKeywords, globalSimpleKeywordInput.trim()])
+                            setGlobalSimpleKeywordInput("")
+                            setIsAddingGlobalSimpleKeyword(false)
+                          }
+                        }}
+                        placeholder="예) 여행"
+                        className="flex-1 text-sm bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsAddingGlobalSimpleKeyword(false)
+                          setGlobalSimpleKeywordInput("")
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
+                  {globalSimpleKeywords.map((keyword, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg"
+                    >
+                      <span className="text-sm text-foreground">{keyword}</span>
+                      <button
+                        onClick={() => {
+                          setGlobalSimpleKeywords(globalSimpleKeywords.filter((_, i) => i !== idx))
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI 기반 관심사 알림 이용하기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">AI 기반 관심사 알림 이용하기</span>
                   <button
                     onClick={() => setGlobalNotificationEnabled(!globalNotificationEnabled)}
                     className={`relative w-12 h-6 rounded-full transition-colors ${
@@ -763,13 +1053,16 @@ export function ChatDemo() {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  등록된 관심사에 관련된 대화가 이루어지면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.
+                  AI가 관심사와 메시지의 연관성을 판단하여 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.
                 </p>
               </div>
 
-              {/* 알림 발생 민감도 */}
+              {/* AI 기반 관심사 알림 */}
               <div className={`space-y-2 ${!globalNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
-                <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">AI 기반 관심사</span>
+                <p className="text-xs text-muted-foreground">AI가 메시지와 관심사의 연관성을 판단하여 알림을 보냅니다.</p>
+
+                <div className="flex items-center justify-between mt-4">
                   <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
                   <span className="text-xs font-bold text-foreground">{globalSensitivity}%</span>
                 </div>
@@ -794,7 +1087,7 @@ export function ChatDemo() {
                 </div>
               </div>
 
-              {/* 관심사 리스트 */}
+              {/* AI 관심사 리스트 */}
               <div className={`space-y-3 ${!globalNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">관심사 ({globalConditions.length}/20)</span>
@@ -873,14 +1166,14 @@ export function ChatDemo() {
       <p className="text-muted-foreground text-sm">왼쪽 폰에서 메시지를 보내면 오른쪽 폰에 알림이 나타납니다</p>
       <div className="flex flex-col md:flex-row gap-8 md:gap-16">
         <div className="flex flex-col items-center gap-2">
-          <span className="text-sm text-muted-foreground">상대방</span>
+          <span className="text-md text-muted-foreground">상대방</span>
           <PhoneMockup>
             <ChatScreen messages={messages} onSendMessage={sendMessage} isMe={false} />
           </PhoneMockup>
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <span className="text-sm text-muted-foreground">나</span>
+          <span className="text-md text-muted-foreground">나</span>
           <PhoneMockup onPowerButtonClick={handlePowerButton}>{renderRightPhoneContent()}</PhoneMockup>
         </div>
       </div>

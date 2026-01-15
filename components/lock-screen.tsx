@@ -20,7 +20,7 @@ export function LockScreen({ children, onClick }: LockScreenProps) {
   })
 
   return (
-    <div onClick={onClick} className="h-full bg-lock-screen flex flex-col relative cursor-pointer">
+    <div onClick={onClick} className="absolute inset-0 bg-lock-screen flex flex-col cursor-pointer">
       {/* 시간 및 날짜 */}
       <div className="flex-1 flex flex-col items-center justify-center text-lock-screen-foreground">
         <span className="text-5xl font-light">{timeString}</span>
