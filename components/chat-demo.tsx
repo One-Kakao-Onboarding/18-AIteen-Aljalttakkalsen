@@ -291,67 +291,70 @@ export function ChatDemo() {
       )
     )
 
-    // 알림이 켜져 있는지 확인
+    // 1. 일반 메시지 알림 (알림이 켜져있을 때만)
     if (mainChatRoom?.notificationEnabled) {
+      const generalNotification: Notification = {
+        id: Date.now().toString(),
+        message: text,
+        timestamp: new Date(),
+      }
+
+      setNotifications((prev) => [generalNotification, ...prev])
+      playNotificationSound()
+
+      // 4초 후 일반 알림 자동 제거
+      const generalTimeoutId = setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== generalNotification.id))
+        notificationTimeoutsRef.current.delete(generalNotification.id)
+      }, 4000)
+
+      notificationTimeoutsRef.current.set(generalNotification.id, generalTimeoutId)
+    }
+
+    // 2. 키워드 알림 (알림 on/off 여부와 관계없이 키워드 조건이 있으면 체크)
+    const conditionToUse = mainChatRoom?.notificationCondition || globalCondition
+    const sensitivityToUse = mainChatRoom?.notificationCondition
+      ? mainChatRoom.notificationSensitivity
+      : globalSensitivity
+
+    if (conditionToUse) {
       // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
       const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
       const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
 
-      console.log("Checking unread messages:", allUnreadText)
+      console.log("Checking unread messages for keyword:", allUnreadText)
 
-      // 채팅방별 조건이 있으면 채팅방 조건 사용, 없으면 전역 조건 사용
-      const conditionToUse = mainChatRoom.notificationCondition || globalCondition
-      const sensitivityToUse = mainChatRoom.notificationCondition
-        ? mainChatRoom.notificationSensitivity
-        : globalSensitivity
+      const result = await checkConditionMatch(allUnreadText, conditionToUse, sensitivityToUse)
 
-      // LLM으로 조건 체크 (읽지 않은 메시지 전체 + 민감도)
-      const { shouldNotify, topic } = await checkConditionMatch(allUnreadText, conditionToUse, sensitivityToUse)
-
-      if (shouldNotify) {
+      if (result.shouldNotify && result.topic) {
         // 이미 알림이 간 토픽인지 확인
-        const alreadyNotified = topic && mainChatRoom.notifiedTopics.includes(topic)
+        const alreadyNotified = mainChatRoom?.notifiedTopics.includes(result.topic)
 
         if (!alreadyNotified) {
-          // 알림 메시지 생성
-          let notifText = ""
-          if ((mainChatRoom.notificationCondition || globalCondition) && topic) {
-            // 조건이 있고 주제가 추출된 경우
-            notifText = `${topic} 관련 이야기가 나오고 있어요!`
-          } else {
-            // 조건이 없는 경우 (일반 알림)
-            notifText = text
-          }
-
-          // 새 알림 생성
-          const newNotification: Notification = {
-            id: Date.now().toString(),
-            message: notifText,
+          // 키워드 알림 생성
+          const keywordNotification: Notification = {
+            id: (Date.now() + 1).toString(), // ID 충돌 방지
+            message: `${result.topic} 관련 이야기가 나오고 있어요!`,
             timestamp: new Date(),
           }
 
-          // 알림을 맨 앞에 추가 (새 알림이 위에 표시됨)
-          setNotifications((prev) => [newNotification, ...prev])
-
-          // 알림음 재생
+          setNotifications((prev) => [keywordNotification, ...prev])
           playNotificationSound()
 
           // 토픽을 notifiedTopics에 추가
-          if (topic) {
-            setChatRooms((prev) =>
-              prev.map((room) =>
-                room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, topic] } : room
-              )
+          setChatRooms((prev) =>
+            prev.map((room) =>
+              room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, result.topic] } : room
             )
-          }
+          )
 
-          // 4초 후 알림 자동 제거
-          const timeoutId = setTimeout(() => {
-            setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id))
-            notificationTimeoutsRef.current.delete(newNotification.id)
+          // 4초 후 키워드 알림 자동 제거
+          const keywordTimeoutId = setTimeout(() => {
+            setNotifications((prev) => prev.filter((n) => n.id !== keywordNotification.id))
+            notificationTimeoutsRef.current.delete(keywordNotification.id)
           }, 4000)
 
-          notificationTimeoutsRef.current.set(newNotification.id, timeoutId)
+          notificationTimeoutsRef.current.set(keywordNotification.id, keywordTimeoutId)
         }
       }
     }
