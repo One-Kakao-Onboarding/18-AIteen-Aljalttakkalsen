@@ -42,6 +42,11 @@ export function ChatDemo() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
   const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>("medium")
+  const [showGlobalModal, setShowGlobalModal] = useState(false)
+  const [globalConditionInput, setGlobalConditionInput] = useState("")
+  const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>("medium")
+  const [globalCondition, setGlobalCondition] = useState<string | undefined>(undefined)
+  const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>("medium")
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
     {
       id: "main",
@@ -167,6 +172,27 @@ export function ChatDemo() {
     setSelectedChatId(null)
   }
 
+  // 전역 알림 설정 열기
+  const handleGlobalNotificationSettings = () => {
+    setGlobalConditionInput(globalCondition || "")
+    setGlobalSensitivityInput(globalSensitivity)
+    setShowGlobalModal(true)
+  }
+
+  // 전역 알림 설정 저장
+  const handleSaveGlobalCondition = () => {
+    setGlobalCondition(globalConditionInput.trim() || undefined)
+    setGlobalSensitivity(globalSensitivityInput)
+    setShowGlobalModal(false)
+  }
+
+  // 전역 알림 조건 삭제
+  const handleRemoveGlobalCondition = () => {
+    setGlobalCondition(undefined)
+    setShowGlobalModal(false)
+    setGlobalConditionInput("")
+  }
+
   // 조건 매칭 확인 함수 (LLM 사용)
   const checkConditionMatch = async (
     message: string,
@@ -268,12 +294,14 @@ export function ChatDemo() {
 
       console.log("Checking unread messages:", allUnreadText)
 
+      // 채팅방별 조건이 있으면 채팅방 조건 사용, 없으면 전역 조건 사용
+      const conditionToUse = mainChatRoom.notificationCondition || globalCondition
+      const sensitivityToUse = mainChatRoom.notificationCondition
+        ? mainChatRoom.notificationSensitivity
+        : globalSensitivity
+
       // LLM으로 조건 체크 (읽지 않은 메시지 전체 + 민감도)
-      const { shouldNotify, topic } = await checkConditionMatch(
-        allUnreadText,
-        mainChatRoom.notificationCondition,
-        mainChatRoom.notificationSensitivity
-      )
+      const { shouldNotify, topic } = await checkConditionMatch(allUnreadText, conditionToUse, sensitivityToUse)
 
       if (shouldNotify) {
         // 이미 알림이 간 토픽인지 확인
@@ -282,7 +310,7 @@ export function ChatDemo() {
         if (!alreadyNotified) {
           // 알림 메시지 생성
           let notifText = ""
-          if (mainChatRoom.notificationCondition && topic) {
+          if ((mainChatRoom.notificationCondition || globalCondition) && topic) {
             // 조건이 있고 주제가 추출된 경우
             notifText = `${topic} 관련 이야기가 나오고 있어요!`
           } else {
@@ -419,7 +447,104 @@ export function ChatDemo() {
               chatRooms={chatRooms}
               onToggleNotification={handleToggleNotification}
               onNotificationSettings={handleNotificationSettings}
+              onGlobalNotificationSettings={handleGlobalNotificationSettings}
             />
+            {/* 전역 알림 조건 설정 모달 */}
+            {showGlobalModal && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
+                onClick={() => setShowGlobalModal(false)}
+              >
+                <div
+                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[320px] w-[90%] max-h-[90%] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2 className="text-base font-bold text-foreground mb-1">전역 알림 조건 설정</h2>
+                  <p className="text-xs text-muted-foreground mb-3">모든 채팅방에 기본으로 적용됩니다</p>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      언제 알림을 받고 싶으신가요?
+                    </label>
+                    <textarea
+                      value={globalConditionInput}
+                      onChange={(e) => setGlobalConditionInput(e.target.value)}
+                      placeholder='예: "여행 예약과 관련된 얘기가 나올 때 알려줘"'
+                      className="w-full px-2 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      개별 채팅방에 조건이 설정되어 있으면 그 조건이 우선 적용됩니다.
+                    </p>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-foreground mb-1">반응 민감도</label>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setGlobalSensitivityInput("high")}
+                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                          globalSensitivityInput === "high"
+                            ? "bg-blue-500 text-white"
+                            : "bg-muted text-foreground hover:bg-muted/70"
+                        }`}
+                      >
+                        높음
+                      </button>
+                      <button
+                        onClick={() => setGlobalSensitivityInput("medium")}
+                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                          globalSensitivityInput === "medium"
+                            ? "bg-blue-500 text-white"
+                            : "bg-muted text-foreground hover:bg-muted/70"
+                        }`}
+                      >
+                        중간
+                      </button>
+                      <button
+                        onClick={() => setGlobalSensitivityInput("low")}
+                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                          globalSensitivityInput === "low"
+                            ? "bg-blue-500 text-white"
+                            : "bg-muted text-foreground hover:bg-muted/70"
+                        }`}
+                      >
+                        낮음
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {globalSensitivityInput === "high" && "조금이라도 관련되면 알림"}
+                      {globalSensitivityInput === "medium" && "명확하게 관련되면 알림"}
+                      {globalSensitivityInput === "low" && "매우 직접적으로 관련될 때만 알림"}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-1.5 justify-end">
+                    {globalCondition && (
+                      <button
+                        onClick={handleRemoveGlobalCondition}
+                        className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        조건 삭제
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowGlobalModal(false)}
+                      className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 rounded-lg transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleSaveGlobalCondition}
+                      className="px-3 py-1.5 text-xs bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors"
+                    >
+                      저장
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 알림 조건 설정 모달 */}
             {showConditionModal && (
               <div

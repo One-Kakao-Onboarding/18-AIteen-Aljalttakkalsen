@@ -24,9 +24,10 @@ interface ChatListScreenProps {
   chatRooms: ChatRoom[]
   onToggleNotification: (chatId: string) => void
   onNotificationSettings: (chatId: string) => void
+  onGlobalNotificationSettings: () => void
 }
 
-export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, chatRooms, onToggleNotification, onNotificationSettings }: ChatListScreenProps) {
+export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, chatRooms, onToggleNotification, onNotificationSettings, onGlobalNotificationSettings }: ChatListScreenProps) {
   const [contextMenu, setContextMenu] = useState<{ chatId: string; x: number; y: number } | null>(null)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
   const longPressTriggeredRef = useRef(false)
@@ -87,7 +88,13 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
       {/* 헤더 */}
       <div className="bg-chat-header px-4 py-3 flex items-center justify-between border-b border-border">
         <span className="font-bold text-foreground">채팅</span>
-        <MessageCircle className="w-5 h-5 text-muted-foreground" />
+        <button
+          onClick={onGlobalNotificationSettings}
+          className="p-1.5 hover:bg-muted/50 rounded-lg transition-colors"
+          aria-label="전역 알림 설정"
+        >
+          <Settings className="w-5 h-5 text-muted-foreground" />
+        </button>
       </div>
 
       {/* 채팅방 리스트 */}
