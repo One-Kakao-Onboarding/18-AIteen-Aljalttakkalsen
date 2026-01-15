@@ -27,6 +27,7 @@ interface ChatRoom {
   notificationEnabled: boolean
   notificationCondition?: string
   notificationSensitivity: NotificationSensitivity
+  notifiedTopics: string[]
 }
 
 type RightPhoneScreen = "off" | "list" | "chat"
@@ -51,6 +52,7 @@ export function ChatDemo() {
       time: "방금",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
     {
       id: "group1",
@@ -61,6 +63,7 @@ export function ChatDemo() {
       time: "오후 2:30",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
     {
       id: "friend1",
@@ -71,6 +74,7 @@ export function ChatDemo() {
       time: "오후 1:15",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
     {
       id: "group2",
@@ -81,6 +85,7 @@ export function ChatDemo() {
       time: "오전 11:00",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
     {
       id: "friend2",
@@ -91,6 +96,7 @@ export function ChatDemo() {
       time: "어제",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
     {
       id: "friend3",
@@ -101,6 +107,7 @@ export function ChatDemo() {
       time: "어제",
       notificationEnabled: true,
       notificationSensitivity: "medium",
+      notifiedTopics: [],
     },
   ])
 
@@ -269,31 +276,45 @@ export function ChatDemo() {
       )
 
       if (shouldNotify) {
-        // 알림 메시지 생성
-        let notifText = ""
-        if (mainChatRoom.notificationCondition && topic) {
-          // 조건이 있고 주제가 추출된 경우
-          notifText = `${topic} 관련 이야기가 나오고 있어요!`
-        } else {
-          // 조건이 없는 경우 (일반 알림)
-          notifText = text
+        // 이미 알림이 간 토픽인지 확인
+        const alreadyNotified = topic && mainChatRoom.notifiedTopics.includes(topic)
+
+        if (!alreadyNotified) {
+          // 알림 메시지 생성
+          let notifText = ""
+          if (mainChatRoom.notificationCondition && topic) {
+            // 조건이 있고 주제가 추출된 경우
+            notifText = `${topic} 관련 이야기가 나오고 있어요!`
+          } else {
+            // 조건이 없는 경우 (일반 알림)
+            notifText = text
+          }
+
+          setNotificationMessage(notifText)
+          setShowNotification(true)
+
+          // 알림음 재생
+          playNotificationSound()
+
+          // 토픽을 notifiedTopics에 추가
+          if (topic) {
+            setChatRooms((prev) =>
+              prev.map((room) =>
+                room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, topic] } : room
+              )
+            )
+          }
+
+          // 기존 타이머가 있으면 제거
+          if (notificationTimeoutRef.current) {
+            clearTimeout(notificationTimeoutRef.current)
+          }
+
+          // 4초 후 알림 자동 숨김
+          notificationTimeoutRef.current = setTimeout(() => {
+            setShowNotification(false)
+          }, 4000)
         }
-
-        setNotificationMessage(notifText)
-        setShowNotification(true)
-
-        // 알림음 재생
-        playNotificationSound()
-
-        // 기존 타이머가 있으면 제거
-        if (notificationTimeoutRef.current) {
-          clearTimeout(notificationTimeoutRef.current)
-        }
-
-        // 4초 후 알림 자동 숨김
-        notificationTimeoutRef.current = setTimeout(() => {
-          setShowNotification(false)
-        }, 4000)
       }
     }
   }
@@ -328,8 +349,10 @@ export function ChatDemo() {
     setShowNotification(false)
     setRightPhoneScreen("chat")
     setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
-    // chatRooms의 unreadCount 초기화
-    setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
+    // chatRooms의 unreadCount와 notifiedTopics 초기화
+    setChatRooms((prev) =>
+      prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0, notifiedTopics: [] } : room))
+    )
     // 알림 타이머 정리
     if (notificationTimeoutRef.current) {
       clearTimeout(notificationTimeoutRef.current)
@@ -346,8 +369,10 @@ export function ChatDemo() {
     if (chatId === "main") {
       setRightPhoneScreen("chat")
       setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
-      // chatRooms의 unreadCount 초기화
-      setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
+      // chatRooms의 unreadCount와 notifiedTopics 초기화
+      setChatRooms((prev) =>
+        prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0, notifiedTopics: [] } : room))
+      )
     }
   }
 
@@ -358,8 +383,10 @@ export function ChatDemo() {
   useEffect(() => {
     if (rightPhoneScreen === "chat") {
       setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
-      // chatRooms의 unreadCount 초기화
-      setChatRooms((prev) => prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0 } : room)))
+      // chatRooms의 unreadCount와 notifiedTopics 초기화
+      setChatRooms((prev) =>
+        prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0, notifiedTopics: [] } : room))
+      )
     }
   }, [rightPhoneScreen])
 
