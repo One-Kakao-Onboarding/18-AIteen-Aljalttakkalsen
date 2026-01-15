@@ -13,8 +13,10 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
+  keywordNotificationEnabled: boolean
   notificationConditions: Array<{ id: string; condition: string }>
   notificationSensitivity: NotificationSensitivity
+  notifiedTopics: string[]
 }
 
 interface ChatListScreenProps {
@@ -124,23 +126,23 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
                   {!room.notificationEnabled && (
                     <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   )}
-                  {room.notificationConditions.length > 0 && (
-                    <Settings className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                  )}
                 </div>
                 <span className="text-[10px] text-muted-foreground flex-shrink-0">{room.time}</span>
               </div>
-              <div className="flex items-center justify-between mt-0.5">
+              <div className="flex items-center justify-between mt-[0px]">
                 <div className="flex-1 min-w-0">
-                  {room.notificationConditions.length > 0 && (
-                    <p className="text-[10px] text-blue-500 truncate mb-0.5">
-                      조건: {room.notificationConditions.map((c) => c.condition).join(", ")}
+                  {room.keywordNotificationEnabled && room.notificationConditions.length > 0 && (
+                    <p className="text-[10px] text-blue-500 truncate leading-none m-0 p-0 mb-[2px]">
+                      {room.notificationConditions.map((c) => `#${c.condition}`).join(", ")}
                     </p>
                   )}
-                  <span className="text-xs text-muted-foreground truncate">{room.lastMessage}</span>
+                  <span className="text-xs text-muted-foreground truncate leading-none block">{room.lastMessage}</span>
                 </div>
                 {room.unreadCount > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 bg-unread text-white text-[10px] font-bold rounded-full min-w-[18px] text-center flex-shrink-0">
+                  <span className="ml-2 px-1.5 py-0.5 bg-[#F4551E] text-white text-[10px] font-bold rounded-full min-w-[18px] text-center flex-shrink-0 inline-flex items-center gap-0.5">
+                    {room.notifiedTopics.length > 0 && (
+                      <img src="/keyword_icon.png" alt="keyword" className="w-3 h-3" />
+                    )}
                     {room.unreadCount > 99 ? "99+" : room.unreadCount}
                   </span>
                 )}
