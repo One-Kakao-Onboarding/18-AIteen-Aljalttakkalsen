@@ -23,7 +23,7 @@ interface Notification {
   keyword?: string // 볼드 처리할 키워드
 }
 
-type NotificationSensitivity = "high" | "medium" | "low"
+type NotificationSensitivity = number // 0-100 사이의 임계값 (낮을수록 민감)
 
 interface ChatRoom {
   id: string
@@ -49,12 +49,12 @@ export function ChatDemo() {
   const [showConditionModal, setShowConditionModal] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
-  const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>("medium")
+  const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>(60)
   const [showGlobalModal, setShowGlobalModal] = useState(false)
   const [globalConditionInput, setGlobalConditionInput] = useState("")
-  const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>("medium")
+  const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>(60)
   const [globalConditions, setGlobalConditions] = useState<Array<{ id: string; condition: string }>>([])
-  const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>("medium")
+  const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>(60)
   const [globalNotificationEnabled, setGlobalNotificationEnabled] = useState(false)
   const [globalAllNotificationEnabled, setGlobalAllNotificationEnabled] = useState(true)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
@@ -68,7 +68,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
     {
@@ -81,7 +81,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
     {
@@ -94,7 +94,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
     {
@@ -107,7 +107,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
     {
@@ -120,7 +120,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
     {
@@ -133,7 +133,7 @@ export function ChatDemo() {
       notificationEnabled: true,
       keywordNotificationEnabled: false,
       notificationConditions: [],
-      notificationSensitivity: "medium",
+      notificationSensitivity: 60,
       notifiedTopics: [],
     },
   ])
@@ -594,31 +594,29 @@ export function ChatDemo() {
 
               {/* 알림 발생 민감도 */}
               <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
-                <p className="text-xs text-muted-foreground">민감도가 낮을수록 관련도가 높은 대화일때만 알림을 보내요</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
+                  <span className="text-xs font-bold text-foreground">{selectedRoom?.notificationSensitivity}%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  값이 높을수록 더 민감하게,<br/>낮을수록 확실한 경우에만 알림을 보내요
+                </p>
                 <div className="flex items-center gap-3 mt-4">
-                  <span className="text-xs text-muted-foreground">낮음</span>
+                  <span className="text-xs text-muted-foreground">엄격</span>
                   <input
                     type="range"
-                    min="0"
-                    max="2"
-                    value={
-                      selectedRoom?.notificationSensitivity === "low"
-                        ? 0
-                        : selectedRoom?.notificationSensitivity === "medium"
-                        ? 1
-                        : 2
-                    }
+                    min="10"
+                    max="90"
+                    value={selectedRoom?.notificationSensitivity || 60}
                     onChange={(e) => {
                       const val = Number(e.target.value)
-                      const sensitivity = val === 0 ? "low" : val === 1 ? "medium" : "high"
                       setChatRooms((prev) =>
-                        prev.map((r) => (r.id === selectedChatId ? { ...r, notificationSensitivity: sensitivity } : r))
+                        prev.map((r) => (r.id === selectedChatId ? { ...r, notificationSensitivity: val } : r))
                       )
                     }}
-                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-400"
+                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                   />
-                  <span className="text-xs text-muted-foreground">높음</span>
+                  <span className="text-xs text-muted-foreground">민감</span>
                 </div>
               </div>
 
@@ -786,22 +784,27 @@ export function ChatDemo() {
 
               {/* 알림 발생 민감도 */}
               <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
-                <p className="text-xs text-muted-foreground">민감도가 낮을수록 관련도가 높은 대화일때만 알림을 보내요</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
+                  <span className="text-xs font-bold text-foreground">{globalSensitivity}%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  값이 높을수록 더 민감하게, <br/>낮을수록 확실한 경우에만 알림을 보내요
+                </p>
                 <div className="flex items-center gap-3 mt-4">
-                  <span className="text-xs text-muted-foreground">낮음</span>
+                  <span className="text-xs text-muted-foreground">엄격</span>
                   <input
                     type="range"
-                    min="0"
-                    max="2"
-                    value={globalSensitivity === "low" ? 0 : globalSensitivity === "medium" ? 1 : 2}
+                    min="10"
+                    max="90"
+                    value={globalSensitivity}
                     onChange={(e) => {
                       const val = Number(e.target.value)
-                      setGlobalSensitivity(val === 0 ? "low" : val === 1 ? "medium" : "high")
+                      setGlobalSensitivity(val)
                     }}
-                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-400"
+                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                   />
-                  <span className="text-xs text-muted-foreground">높음</span>
+                  <span className="text-xs text-muted-foreground">민감</span>
                 </div>
               </div>
 

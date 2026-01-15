@@ -16,25 +16,8 @@ export async function POST(request: NextRequest) {
 
     console.log("Calling Gemini API with message:", message, "conditions:", conditions)
 
-    // 민감도에 따른 판단 기준 설정 함수
-    const getSensitivityGuideline = (sensitivity: string) => {
-      if (sensitivity === "high") {
-        return "조금이라도 관련이 있으면 YES로 판단하세요. 매우 넓게 해석하세요."
-      } else if (sensitivity === "medium") {
-        return "명확하게 관련이 있을 때만 YES로 판단하세요."
-      } else {
-        // low
-        return "매우 직접적이고 확실하게 관련이 있을 때만 YES로 판단하세요. 엄격하게 판단하세요."
-      }
-    }
-
-    // 조건 목록을 텍스트로 변환 (민감도 포함)
-    const conditionsText = conditions
-      .map(
-        (cond: any, idx: number) =>
-          `${idx + 1}. "${cond.condition}" (민감도: ${getSensitivityGuideline(cond.sensitivity || "medium")})`
-      )
-      .join("\n")
+    // 조건 목록을 텍스트로 변환
+    const conditionsText = conditions.map((cond: any, idx: number) => `${idx + 1}. "${cond.condition}"`).join("\n")
 
     // Gemini API 호출 (gemini-2.0-flash-001: thinking 없어서 빠르고 효율적)
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`
@@ -44,30 +27,48 @@ export async function POST(request: NextRequest) {
         {
           parts: [
             {
-              text: `사용자가 설정한 여러 알림 조건과 받은 메시지를 분석해주세요.
+              text: `당신은 채팅 메시지를 분석하여 각 알림 조건과 메시지의 연관도를 확률로 판단하는 시스템입니다.
 
-알림 조건들 (각 조건마다 민감도가 다름):
+알림 조건들:
 ${conditionsText}
 
 받은 메시지: "${message}"
 
-각 조건마다 해당 조건의 민감도 기준에 따라 메시지가 해당하는지 판단하고, 해당한다면 조건의 핵심 주제를 간단히 추출해주세요.
+각 조건마다 메시지가 해당 조건과 얼마나 관련이 있는지 0-100 사이의 확률(%)로 판단하세요:
+- 0%: 전혀 관련 없음
+- 1-30%: 매우 간접적이거나 막연한 관련성
+- 31-60%: 어느 정도 관련이 있지만 명확하지 않음
+- 61-80%: 명확히 관련이 있음
+- 81-100%: 매우 직접적이고 구체적으로 관련됨
 
-응답 형식 (각 조건마다 한 줄씩, 순서대로):
-- 해당함: "YES|주제" (예: "YES|돈", "YES|여행 예약")
-- 해당 안함: "NO"
+판단 예시:
+- 조건: "해외여행"
+  * "일본 여행 가자" → 95% (매우 구체적)
+  * "여행 계획 세우자" → 40% (해외인지 불명확)
+  * "놀러가고 싶다" → 15% (막연한 표현)
+  * "오늘 점심 뭐 먹지?" → 0% (관련 없음)
+
+- 조건: "운동"
+  * "헬스장 가자" → 95%
+  * "살 빼고 싶다" → 50%
+  * "배부르다" → 5%
+
+응답 형식 (각 조건마다 정확히 한 줄씩, 순서대로):
+확률%|주제명
 
 예시:
-YES|여행
-NO
+95|해외여행
+40|여행
+15|놀러가기
+0
 
-반드시 위 형식으로만 답변해주세요. 각 조건당 정확히 한 줄씩 출력하세요.`,
+반드시 위 형식으로만 답변하세요. 각 조건당 정확히 한 줄씩 출력하세요.`,
             },
           ],
         },
       ],
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.2,
         maxOutputTokens: 200,
       },
     }
@@ -108,25 +109,32 @@ NO
 
       // 각 조건에 대한 결과 파싱
       for (let i = 0; i < conditions.length; i++) {
-        const line = lines[i] || "NO"
-        const upperLine = line.toUpperCase()
+        const line = lines[i] || "0"
+        const condition = conditions[i]
+        // 민감도를 역전: 민감도 100 = 임계값 0 (매우 민감), 민감도 0 = 임계값 100 (매우 엄격)
+        const threshold = 100 - (condition.sensitivity || 60)
 
-        let shouldNotify = false
+        let probability = 0
         let topic = ""
 
-        if (upperLine.includes("YES")) {
-          shouldNotify = true
-          // "|" 로 분리해서 주제 추출
+        // "확률|주제" 형식 파싱
+        if (line.includes("|")) {
           const parts = line.split("|")
-          if (parts.length > 1) {
-            topic = parts[1].trim()
-          }
+          probability = parseInt(parts[0].trim()) || 0
+          topic = parts[1]?.trim() || ""
+        } else {
+          // 숫자만 있는 경우
+          probability = parseInt(line.trim()) || 0
         }
 
+        const shouldNotify = probability >= threshold
+
         results.push({
-          conditionId: conditions[i].id,
+          conditionId: condition.id,
           shouldNotify,
-          topic,
+          topic: shouldNotify ? topic || condition.condition : "",
+          probability, // 디버깅용
+          threshold, // 디버깅용
         })
       }
     }
