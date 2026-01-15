@@ -15,6 +15,12 @@ interface Message {
   read: boolean
 }
 
+interface Notification {
+  id: string
+  message: string
+  timestamp: Date
+}
+
 type NotificationSensitivity = "high" | "medium" | "low"
 
 interface ChatRoom {
@@ -35,9 +41,8 @@ type RightPhoneScreen = "off" | "list" | "chat"
 export function ChatDemo() {
   const [messages, setMessages] = useState<Message[]>([])
   const [rightPhoneScreen, setRightPhoneScreen] = useState<RightPhoneScreen>("off")
-  const [showNotification, setShowNotification] = useState(false)
-  const [notificationMessage, setNotificationMessage] = useState<string>("")
-  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const [showConditionModal, setShowConditionModal] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
@@ -318,8 +323,15 @@ export function ChatDemo() {
             notifText = text
           }
 
-          setNotificationMessage(notifText)
-          setShowNotification(true)
+          // 새 알림 생성
+          const newNotification: Notification = {
+            id: Date.now().toString(),
+            message: notifText,
+            timestamp: new Date(),
+          }
+
+          // 알림을 맨 앞에 추가 (새 알림이 위에 표시됨)
+          setNotifications((prev) => [newNotification, ...prev])
 
           // 알림음 재생
           playNotificationSound()
@@ -333,15 +345,13 @@ export function ChatDemo() {
             )
           }
 
-          // 기존 타이머가 있으면 제거
-          if (notificationTimeoutRef.current) {
-            clearTimeout(notificationTimeoutRef.current)
-          }
-
-          // 4초 후 알림 자동 숨김
-          notificationTimeoutRef.current = setTimeout(() => {
-            setShowNotification(false)
+          // 4초 후 알림 자동 제거
+          const timeoutId = setTimeout(() => {
+            setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id))
+            notificationTimeoutsRef.current.delete(newNotification.id)
           }, 4000)
+
+          notificationTimeoutsRef.current.set(newNotification.id, timeoutId)
         }
       }
     }
@@ -364,31 +374,35 @@ export function ChatDemo() {
       setRightPhoneScreen("list")
     } else {
       setRightPhoneScreen("off")
-      setShowNotification(false)
-      // 알림 타이머 정리
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current)
-      }
+      setNotifications([])
+      // 모든 알림 타이머 정리
+      notificationTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout))
+      notificationTimeoutsRef.current.clear()
     }
   }
 
   // 알림 클릭시 채팅방으로 이동
-  const handleNotificationClick = () => {
-    setShowNotification(false)
+  const handleNotificationClick = (notificationId: string) => {
+    // 클릭한 알림 제거
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+
+    // 해당 알림의 타이머 정리
+    const timeout = notificationTimeoutsRef.current.get(notificationId)
+    if (timeout) {
+      clearTimeout(timeout)
+      notificationTimeoutsRef.current.delete(notificationId)
+    }
+
     setRightPhoneScreen("chat")
     setMessages((prev) => prev.map((msg) => (msg.sender === "other" ? { ...msg, read: true } : msg)))
     // chatRooms의 unreadCount와 notifiedTopics 초기화
     setChatRooms((prev) =>
       prev.map((room) => (room.id === "main" ? { ...room, unreadCount: 0, notifiedTopics: [] } : room))
     )
-    // 알림 타이머 정리
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current)
-    }
   }
 
   const handleLockScreenClick = () => {
-    if (!showNotification) {
+    if (notifications.length === 0) {
       setRightPhoneScreen("list")
     }
   }
@@ -421,9 +435,8 @@ export function ChatDemo() {
   // 클린업: 알림 타이머 정리
   useEffect(() => {
     return () => {
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current)
-      }
+      notificationTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout))
+      notificationTimeoutsRef.current.clear()
     }
   }, [])
 
@@ -432,9 +445,15 @@ export function ChatDemo() {
       case "off":
         return (
           <LockScreen onClick={handleLockScreenClick}>
-            {showNotification && notificationMessage && (
-              <NotificationBanner message={notificationMessage} onClick={handleNotificationClick} />
-            )}
+            <div className="w-full space-y-2 px-2">
+              {notifications.map((notification) => (
+                <NotificationBanner
+                  key={notification.id}
+                  message={notification.message}
+                  onClick={() => handleNotificationClick(notification.id)}
+                />
+              ))}
+            </div>
           </LockScreen>
         )
       case "list":
