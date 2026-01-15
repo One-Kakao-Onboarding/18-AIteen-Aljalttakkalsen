@@ -31,12 +31,12 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
-  notificationCondition?: string
+  notificationConditions: Array<{ id: string; condition: string }>
   notificationSensitivity: NotificationSensitivity
   notifiedTopics: string[]
 }
 
-type RightPhoneScreen = "off" | "list" | "chat" | "global-settings"
+type RightPhoneScreen = "off" | "list" | "chat" | "global-settings" | "individual-settings"
 
 export function ChatDemo() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -62,6 +62,7 @@ export function ChatDemo() {
       avatar: "👤",
       time: "방금",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -73,6 +74,7 @@ export function ChatDemo() {
       avatar: "👨‍👩‍👧‍👦",
       time: "오후 2:30",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -84,6 +86,7 @@ export function ChatDemo() {
       avatar: "🧑",
       time: "오후 1:15",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -95,6 +98,7 @@ export function ChatDemo() {
       avatar: "💼",
       time: "오전 11:00",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -106,6 +110,7 @@ export function ChatDemo() {
       avatar: "👩",
       time: "어제",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -117,6 +122,7 @@ export function ChatDemo() {
       avatar: "🧔",
       time: "어제",
       notificationEnabled: true,
+      notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
     },
@@ -133,49 +139,44 @@ export function ChatDemo() {
     )
   }
 
-  // 알림 조건 설정 핸들러
+  // 알림 조건 설정 화면으로 이동
   const handleNotificationSettings = (chatId: string) => {
-    const room = chatRooms.find((r) => r.id === chatId)
-    if (room) {
-      setSelectedChatId(chatId)
-      setConditionInput(room.notificationCondition || "")
-      setSensitivityInput(room.notificationSensitivity)
-      setShowConditionModal(true)
+    setSelectedChatId(chatId)
+    setRightPhoneScreen("individual-settings")
+  }
+
+  // 개별 채팅방 키워드 추가
+  const handleAddIndividualCondition = () => {
+    if (conditionInput.trim() && selectedChatId) {
+      const room = chatRooms.find((r) => r.id === selectedChatId)
+      if (room && room.notificationConditions.length < 20) {
+        const newCondition = {
+          id: Date.now().toString(),
+          condition: conditionInput.trim(),
+        }
+        setChatRooms((prev) =>
+          prev.map((r) =>
+            r.id === selectedChatId
+              ? { ...r, notificationConditions: [...r.notificationConditions, newCondition] }
+              : r
+          )
+        )
+        setConditionInput("")
+      }
     }
   }
 
-  // 알림 조건 저장
-  const handleSaveCondition = () => {
+  // 개별 채팅방 키워드 삭제
+  const handleRemoveIndividualCondition = (conditionId: string) => {
     if (selectedChatId) {
       setChatRooms((prev) =>
-        prev.map((room) =>
-          room.id === selectedChatId
-            ? {
-                ...room,
-                notificationCondition: conditionInput.trim() || undefined,
-                notificationSensitivity: sensitivityInput,
-                notificationEnabled: true,
-              }
-            : room
+        prev.map((r) =>
+          r.id === selectedChatId
+            ? { ...r, notificationConditions: r.notificationConditions.filter((c) => c.id !== conditionId) }
+            : r
         )
       )
     }
-    setShowConditionModal(false)
-    setConditionInput("")
-    setSensitivityInput("medium")
-    setSelectedChatId(null)
-  }
-
-  // 알림 조건 삭제
-  const handleRemoveCondition = () => {
-    if (selectedChatId) {
-      setChatRooms((prev) =>
-        prev.map((room) => (room.id === selectedChatId ? { ...room, notificationCondition: undefined } : room))
-      )
-    }
-    setShowConditionModal(false)
-    setConditionInput("")
-    setSelectedChatId(null)
   }
 
   // 전역 알림 설정 화면으로 이동
@@ -323,11 +324,13 @@ export function ChatDemo() {
     // 개별 조건과 전역 조건을 배열로 모음
     const conditionsToCheck: Array<{ id: string; condition: string; sensitivity: NotificationSensitivity }> = []
 
-    if (mainChatRoom?.notificationCondition) {
-      conditionsToCheck.push({
-        id: "individual",
-        condition: mainChatRoom.notificationCondition,
-        sensitivity: mainChatRoom.notificationSensitivity,
+    if (mainChatRoom && mainChatRoom.notificationConditions.length > 0) {
+      mainChatRoom.notificationConditions.forEach((cond) => {
+        conditionsToCheck.push({
+          id: `individual-${cond.id}`,
+          condition: cond.condition,
+          sensitivity: mainChatRoom.notificationSensitivity,
+        })
       })
     }
 
@@ -455,6 +458,9 @@ export function ChatDemo() {
   const handleBackToList = () => {
     setRightPhoneScreen("list")
     setShowGlobalModal(false)
+    setShowConditionModal(false)
+    setConditionInput("")
+    setSelectedChatId(null)
   }
 
   useEffect(() => {
@@ -503,99 +509,158 @@ export function ChatDemo() {
               onNotificationSettings={handleNotificationSettings}
               onGlobalNotificationSettings={handleGlobalNotificationSettings}
             />
+          </div>
+        )
+      case "individual-settings":
+        const selectedRoom = chatRooms.find((r) => r.id === selectedChatId)
+        return (
+          <div className="h-full flex flex-col" style={{ backgroundColor: "#ffffff" }}>
+            {/* 헤더 */}
+            <div className="px-4 py-3 flex items-center border-b border-border" style={{ backgroundColor: "#ffffff" }}>
+              <button onClick={handleBackToList} className="mr-3">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="font-bold text-foreground">{selectedRoom?.name} 알림 설정</span>
+            </div>
 
-            {/* 알림 조건 설정 모달 */}
+            {/* 내용 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* 알림 켜기/끄기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">알림 받기</span>
+                  <button
+                    onClick={() => handleToggleNotification(selectedChatId!)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      selectedRoom?.notificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        selectedRoom?.notificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">이 채팅방의 메시지에 대한 알림을 받습니다.</p>
+              </div>
+
+              {/* 알림 발생 민감도 */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
+                <p className="text-xs text-muted-foreground">민감도가 낮을수록 관련도가 높은 대화일때만 알림을 보내요</p>
+                <div className="flex items-center gap-3 mt-4">
+                  <span className="text-xs text-muted-foreground">낮음</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    value={
+                      selectedRoom?.notificationSensitivity === "low"
+                        ? 0
+                        : selectedRoom?.notificationSensitivity === "medium"
+                        ? 1
+                        : 2
+                    }
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      const sensitivity = val === 0 ? "low" : val === 1 ? "medium" : "high"
+                      setChatRooms((prev) =>
+                        prev.map((r) => (r.id === selectedChatId ? { ...r, notificationSensitivity: sensitivity } : r))
+                      )
+                    }}
+                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-400"
+                  />
+                  <span className="text-xs text-muted-foreground">높음</span>
+                </div>
+              </div>
+
+              {/* 관심사 리스트 */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    관심사 ({selectedRoom?.notificationConditions.length || 0}/20)
+                  </span>
+                  <button
+                    onClick={() => setShowConditionModal(true)}
+                    className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                  >
+                    추가
+                  </button>
+                </div>
+
+                {/* 키워드 목록 */}
+                <div className="space-y-2">
+                  {selectedRoom?.notificationConditions.map((cond) => (
+                    <div
+                      key={cond.id}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg"
+                    >
+                      <span className="text-sm text-foreground">{cond.condition}</span>
+                      <button
+                        onClick={() => handleRemoveIndividualCondition(cond.id)}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {selectedRoom && selectedRoom.notificationConditions.length === 0 && (
+                    <p className="text-center text-xs text-muted-foreground py-4">
+                      추가 버튼을 눌러 관심사를 등록해보세요
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 키워드 추가 모달 */}
             {showConditionModal && (
               <div
                 className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
                 onClick={() => setShowConditionModal(false)}
               >
                 <div
-                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[320px] w-[90%] max-h-[90%] overflow-y-auto"
+                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[300px] w-[90%]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h2 className="text-base font-bold text-foreground mb-1">알림 조건 설정</h2>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {selectedChatId && chatRooms.find((r) => r.id === selectedChatId)?.name}
-                  </p>
-
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-foreground mb-1">
-                      언제 알림을 받고 싶으신가요?
-                    </label>
-                    <textarea
-                      value={conditionInput}
-                      onChange={(e) => setConditionInput(e.target.value)}
-                      placeholder='예: "여행 예약과 관련된 얘기가 나올 때 알려줘"'
-                      className="w-full px-2 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={3}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      AI가 메시지 내용을 분석하여 조건에 맞는 알림만 보내드립니다.
-                    </p>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-foreground mb-1">반응 민감도</label>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setSensitivityInput("high")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          sensitivityInput === "high"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        높음
-                      </button>
-                      <button
-                        onClick={() => setSensitivityInput("medium")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          sensitivityInput === "medium"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        중간
-                      </button>
-                      <button
-                        onClick={() => setSensitivityInput("low")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          sensitivityInput === "low"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        낮음
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {sensitivityInput === "high" && "조금이라도 관련되면 알림"}
-                      {sensitivityInput === "medium" && "명확하게 관련되면 알림"}
-                      {sensitivityInput === "low" && "매우 직접적으로 관련될 때만 알림"}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-1.5 justify-end">
-                    {selectedChatId && chatRooms.find((r) => r.id === selectedChatId)?.notificationCondition && (
-                      <button
-                        onClick={handleRemoveCondition}
-                        className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                      >
-                        조건 삭제
-                      </button>
-                    )}
+                  <h3 className="text-base font-bold text-foreground mb-3">관심사 추가</h3>
+                  <input
+                    type="text"
+                    value={conditionInput}
+                    onChange={(e) => setConditionInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddIndividualCondition()
+                        setShowConditionModal(false)
+                      }
+                    }}
+                    placeholder="예) 여행 관련 애기"
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex gap-2 justify-end mt-4">
                     <button
-                      onClick={() => setShowConditionModal(false)}
-                      className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 rounded-lg transition-colors"
+                      onClick={() => {
+                        setShowConditionModal(false)
+                        setConditionInput("")
+                      }}
+                      className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50 rounded-lg"
                     >
                       취소
                     </button>
                     <button
-                      onClick={handleSaveCondition}
-                      className="px-3 py-1.5 text-xs bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors"
+                      onClick={() => {
+                        handleAddIndividualCondition()
+                        setShowConditionModal(false)
+                      }}
+                      className="px-4 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-lg"
                     >
-                      저장
+                      추가
                     </button>
                   </div>
                 </div>
@@ -617,9 +682,9 @@ export function ChatDemo() {
         )
       case "global-settings":
         return (
-          <div className="h-full flex flex-col bg-background">
+          <div className="h-full flex flex-col" style={{ backgroundColor: "#ffffff" }}>
             {/* 헤더 */}
-            <div className="bg-card px-4 py-3 flex items-center border-b border-border">
+            <div className="px-4 py-3 flex items-center border-b border-border" style={{ backgroundColor: "#ffffff" }}>
               <button onClick={handleBackToList} className="mr-3">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

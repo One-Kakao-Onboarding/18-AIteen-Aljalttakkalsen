@@ -13,7 +13,7 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
-  notificationCondition?: string
+  notificationConditions: Array<{ id: string; condition: string }>
   notificationSensitivity: NotificationSensitivity
 }
 
@@ -84,9 +84,9 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
   }
 
   return (
-    <div className="h-full flex flex-col bg-chat-bg relative">
+    <div className="h-full flex flex-col relative" style={{ backgroundColor: "#ffffff" }}>
       {/* 헤더 */}
-      <div className="bg-chat-header px-4 py-3 flex items-center justify-between border-b border-border">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-border" style={{ backgroundColor: "#ffffff" }}>
         <span className="font-bold text-foreground">채팅</span>
         <button
           onClick={onGlobalNotificationSettings}
@@ -124,7 +124,7 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
                   {!room.notificationEnabled && (
                     <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   )}
-                  {room.notificationCondition && (
+                  {room.notificationConditions.length > 0 && (
                     <Settings className="w-3 h-3 text-blue-500 flex-shrink-0" />
                   )}
                 </div>
@@ -132,8 +132,10 @@ export function ChatListScreen({ unreadFromMe, onSelectChat, lastMessageFromMe, 
               </div>
               <div className="flex items-center justify-between mt-0.5">
                 <div className="flex-1 min-w-0">
-                  {room.notificationCondition && (
-                    <p className="text-[10px] text-blue-500 truncate mb-0.5">조건: {room.notificationCondition}</p>
+                  {room.notificationConditions.length > 0 && (
+                    <p className="text-[10px] text-blue-500 truncate mb-0.5">
+                      조건: {room.notificationConditions.map((c) => c.condition).join(", ")}
+                    </p>
                   )}
                   <span className="text-xs text-muted-foreground truncate">{room.lastMessage}</span>
                 </div>

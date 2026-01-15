@@ -51,9 +51,9 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
   }
 
   return (
-    <div className="h-full flex flex-col bg-chat-bg">
+    <div className="h-full flex flex-col" style={{ backgroundColor: "#ffffff" }}>
       {/* 헤더 */}
-      <div className="bg-chat-header px-4 py-3 flex items-center gap-3 border-b border-border">
+      <div className="px-4 py-3 flex items-center gap-3 border-b border-border" style={{ backgroundColor: "#ffffff" }}>
         {showBackButton && (
           <button onClick={onBack} className="p-1 -ml-2 hover:bg-muted rounded-full transition-colors">
             <ChevronLeft className="w-5 h-5 text-foreground" />
@@ -66,7 +66,7 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
       </div>
 
       {/* 메시지 영역 */}
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-chat-bg">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2" style={{ backgroundColor: "#ffffff" }}>
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground text-xs mt-8">메시지를 보내보세요</div>
         )}
@@ -76,11 +76,11 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
             <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
               <div className={`flex items-end gap-1 max-w-[80%] ${isMine ? "flex-row-reverse" : ""}`}>
                 <div
-                  className={`px-3 py-2 rounded-2xl text-sm ${
-                    isMine
-                      ? "bg-chat-bubble-me text-chat-bubble-me-foreground rounded-tr-sm"
-                      : "bg-chat-bubble-other text-chat-bubble-other-foreground rounded-tl-sm"
-                  }`}
+                  className={`px-3 py-2 rounded-2xl text-sm ${isMine ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+                  style={{
+                    backgroundColor: isMine ? "#fee500" : "#f6f6f6",
+                    color: "#000000",
+                  }}
                 >
                   {message.text}
                 </div>
@@ -98,7 +98,7 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
       </div>
 
       {/* 입력 영역 */}
-      <form onSubmit={handleSubmit} className="p-2 bg-card border-t border-border">
+      <form onSubmit={handleSubmit} className="p-2 pb-7 pr-4 pl-4 border-t border-border" style={{ backgroundColor: "#ffffff" }}>
         <div className="flex gap-2">
           <Input
             value={inputValue}
@@ -106,7 +106,7 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
             placeholder="메시지를 입력하세요"
             className="flex-1 text-sm h-9 bg-muted border-0"
           />
-          <Button type="submit" size="sm" className="h-9 w-9 p-0 bg-primary hover:bg-primary/90">
+          <Button type="submit" size="sm" className="h-9 w-9 p-0 bg-[#ffffff] hover:bg-[#fee500]">
             <Send className="h-4 w-4" />
           </Button>
         </div>

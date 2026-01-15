@@ -16,7 +16,7 @@ export function PhoneMockup({ children, onPowerButtonClick }: PhoneMockupProps) 
         {onPowerButtonClick && (
           <button
             onClick={onPowerButtonClick}
-            className="absolute -right-1 top-[140px] w-1 h-20 bg-foreground/80 hover:bg-foreground transition-colors cursor-pointer rounded-l-sm"
+            className="absolute -right-1 top-[140px] w-1 h-20 bg-foreground/80 hover:bg-foreground transition-colors cursor-pointer rounded-r-sm"
             aria-label="전원 버튼"
           />
         )}
