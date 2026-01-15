@@ -46,11 +46,11 @@ export function ChatDemo() {
   const [rightPhoneScreen, setRightPhoneScreen] = useState<RightPhoneScreen>("off")
   const [notifications, setNotifications] = useState<Notification[]>([])
   const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
-  const [showConditionModal, setShowConditionModal] = useState(false)
+  const [isAddingIndividualCondition, setIsAddingIndividualCondition] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [conditionInput, setConditionInput] = useState("")
   const [sensitivityInput, setSensitivityInput] = useState<NotificationSensitivity>(60)
-  const [showGlobalModal, setShowGlobalModal] = useState(false)
+  const [isAddingGlobalCondition, setIsAddingGlobalCondition] = useState(false)
   const [globalConditionInput, setGlobalConditionInput] = useState("")
   const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>(60)
   const [globalConditions, setGlobalConditions] = useState<Array<{ id: string; condition: string }>>([])
@@ -574,7 +574,7 @@ export function ChatDemo() {
               {/* 키워드 알림 켜기/끄기 토글 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">키워드 알림 받기
+                  <span className="text-sm font-medium text-foreground">관심사 알림 받기
                   </span>
                   <button
                     onClick={() => handleToggleKeywordNotification(selectedChatId!)}
@@ -593,7 +593,7 @@ export function ChatDemo() {
               </div>
 
               {/* 알림 발생 민감도 */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${!selectedRoom?.keywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
                   <span className="text-xs font-bold text-foreground">{selectedRoom?.notificationSensitivity}%</span>
@@ -614,6 +614,7 @@ export function ChatDemo() {
                         prev.map((r) => (r.id === selectedChatId ? { ...r, notificationSensitivity: val } : r))
                       )
                     }}
+                    disabled={!selectedRoom?.keywordNotificationEnabled}
                     className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                   />
                   <span className="text-xs text-muted-foreground">민감</span>
@@ -621,14 +622,18 @@ export function ChatDemo() {
               </div>
 
               {/* 관심사 리스트 */}
-              <div className="space-y-3">
+              <div className={`space-y-3 ${!selectedRoom?.keywordNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">
                     관심사 ({selectedRoom?.notificationConditions.length || 0}/20)
                   </span>
                   <button
-                    onClick={() => setShowConditionModal(true)}
+                    onClick={() => {
+                      setIsAddingIndividualCondition(true)
+                      setConditionInput("")
+                    }}
                     className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                    disabled={isAddingIndividualCondition || !selectedRoom?.keywordNotificationEnabled}
                   >
                     추가
                   </button>
@@ -636,6 +641,37 @@ export function ChatDemo() {
 
                 {/* 키워드 목록 */}
                 <div className="space-y-2">
+                  {/* 입력 칸 (추가 버튼 클릭 시에만 표시) */}
+                  {isAddingIndividualCondition && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg">
+                      <input
+                        type="text"
+                        value={conditionInput}
+                        onChange={(e) => setConditionInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && conditionInput.trim()) {
+                            handleAddIndividualCondition()
+                            setIsAddingIndividualCondition(false)
+                          }
+                        }}
+                        placeholder="예) 맛집 관련 애기"
+                        className="flex-1 text-sm bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsAddingIndividualCondition(false)
+                          setConditionInput("")
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
                   {selectedRoom?.notificationConditions.map((cond) => (
                     <div
                       key={cond.id}
@@ -644,7 +680,7 @@ export function ChatDemo() {
                       <span className="text-sm text-foreground">{cond.condition}</span>
                       <button
                         onClick={() => handleRemoveIndividualCondition(cond.id)}
-                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500"
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -652,63 +688,9 @@ export function ChatDemo() {
                       </button>
                     </div>
                   ))}
-
-                  {selectedRoom && selectedRoom.notificationConditions.length === 0 && (
-                    <p className="text-center text-xs text-muted-foreground py-4">
-                      추가 버튼을 눌러 관심사를 등록해보세요
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
-
-            {/* 키워드 추가 모달 */}
-            {showConditionModal && (
-              <div
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
-                onClick={() => setShowConditionModal(false)}
-              >
-                <div
-                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[300px] w-[90%]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-base font-bold text-foreground mb-3">관심사 추가</h3>
-                  <input
-                    type="text"
-                    value={conditionInput}
-                    onChange={(e) => setConditionInput(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddIndividualCondition()
-                        setShowConditionModal(false)
-                      }
-                    }}
-                    placeholder="예) 여행 관련 애기"
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="flex gap-2 justify-end mt-4">
-                    <button
-                      onClick={() => {
-                        setShowConditionModal(false)
-                        setConditionInput("")
-                      }}
-                      className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50 rounded-lg"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleAddIndividualCondition()
-                        setShowConditionModal(false)
-                      }}
-                      className="px-4 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-lg"
-                    >
-                      추가
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )
       case "chat":
@@ -783,7 +765,7 @@ export function ChatDemo() {
               </div>
 
               {/* 알림 발생 민감도 */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${!globalNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
                   <span className="text-xs font-bold text-foreground">{globalSensitivity}%</span>
@@ -802,6 +784,7 @@ export function ChatDemo() {
                       const val = Number(e.target.value)
                       setGlobalSensitivity(val)
                     }}
+                    disabled={!globalNotificationEnabled}
                     className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-yellow-400"
                   />
                   <span className="text-xs text-muted-foreground">민감</span>
@@ -809,12 +792,16 @@ export function ChatDemo() {
               </div>
 
               {/* 관심사 리스트 */}
-              <div className="space-y-3">
+              <div className={`space-y-3 ${!globalNotificationEnabled ? "opacity-40 pointer-events-none" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">관심사 ({globalConditions.length}/20)</span>
                   <button
-                    onClick={() => setShowGlobalModal(true)}
+                    onClick={() => {
+                      setIsAddingGlobalCondition(true)
+                      setGlobalConditionInput("")
+                    }}
                     className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                    disabled={isAddingGlobalCondition || !globalNotificationEnabled}
                   >
                     추가
                   </button>
@@ -822,6 +809,37 @@ export function ChatDemo() {
 
                 {/* 키워드 목록 */}
                 <div className="space-y-2">
+                  {/* 입력 칸 (추가 버튼 클릭 시에만 표시) */}
+                  {isAddingGlobalCondition && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg">
+                      <input
+                        type="text"
+                        value={globalConditionInput}
+                        onChange={(e) => setGlobalConditionInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && globalConditionInput.trim()) {
+                            handleAddGlobalCondition()
+                            setIsAddingGlobalCondition(false)
+                          }
+                        }}
+                        placeholder="예) 맛집 관련 애기"
+                        className="flex-1 text-sm bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsAddingGlobalCondition(false)
+                          setGlobalConditionInput("")
+                        }}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
                   {globalConditions.map((cond) => (
                     <div
                       key={cond.id}
@@ -830,7 +848,7 @@ export function ChatDemo() {
                       <span className="text-sm text-foreground">{cond.condition}</span>
                       <button
                         onClick={() => handleRemoveGlobalCondition(cond.id)}
-                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500"
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500 flex-shrink-0"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -838,63 +856,9 @@ export function ChatDemo() {
                       </button>
                     </div>
                   ))}
-
-                  {globalConditions.length === 0 && (
-                    <p className="text-center text-xs text-muted-foreground py-4">
-                      추가 버튼을 눌러 관심사를 등록해보세요
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
-
-            {/* 키워드 추가 모달 */}
-            {showGlobalModal && (
-              <div
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
-                onClick={() => setShowGlobalModal(false)}
-              >
-                <div
-                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[300px] w-[90%]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-base font-bold text-foreground mb-3">관심사 추가</h3>
-                  <input
-                    type="text"
-                    value={globalConditionInput}
-                    onChange={(e) => setGlobalConditionInput(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddGlobalCondition()
-                        setShowGlobalModal(false)
-                      }
-                    }}
-                    placeholder="예) 여행 관련 애기"
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="flex gap-2 justify-end mt-4">
-                    <button
-                      onClick={() => {
-                        setShowGlobalModal(false)
-                        setGlobalConditionInput("")
-                      }}
-                      className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50 rounded-lg"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleAddGlobalCondition()
-                        setShowGlobalModal(false)
-                      }}
-                      className="px-4 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-lg"
-                    >
-                      추가
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )
     }
