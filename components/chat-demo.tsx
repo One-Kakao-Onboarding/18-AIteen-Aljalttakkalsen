@@ -36,7 +36,7 @@ interface ChatRoom {
   notifiedTopics: string[]
 }
 
-type RightPhoneScreen = "off" | "list" | "chat"
+type RightPhoneScreen = "off" | "list" | "chat" | "global-settings"
 
 export function ChatDemo() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -50,8 +50,9 @@ export function ChatDemo() {
   const [showGlobalModal, setShowGlobalModal] = useState(false)
   const [globalConditionInput, setGlobalConditionInput] = useState("")
   const [globalSensitivityInput, setGlobalSensitivityInput] = useState<NotificationSensitivity>("medium")
-  const [globalCondition, setGlobalCondition] = useState<string | undefined>(undefined)
+  const [globalConditions, setGlobalConditions] = useState<Array<{ id: string; condition: string }>>([])
   const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>("medium")
+  const [globalNotificationEnabled, setGlobalNotificationEnabled] = useState(false)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
     {
       id: "main",
@@ -177,25 +178,26 @@ export function ChatDemo() {
     setSelectedChatId(null)
   }
 
-  // 전역 알림 설정 열기
+  // 전역 알림 설정 화면으로 이동
   const handleGlobalNotificationSettings = () => {
-    setGlobalConditionInput(globalCondition || "")
-    setGlobalSensitivityInput(globalSensitivity)
-    setShowGlobalModal(true)
+    setRightPhoneScreen("global-settings")
   }
 
-  // 전역 알림 설정 저장
-  const handleSaveGlobalCondition = () => {
-    setGlobalCondition(globalConditionInput.trim() || undefined)
-    setGlobalSensitivity(globalSensitivityInput)
-    setShowGlobalModal(false)
+  // 전역 키워드 추가
+  const handleAddGlobalCondition = () => {
+    if (globalConditionInput.trim() && globalConditions.length < 20) {
+      const newCondition = {
+        id: Date.now().toString(),
+        condition: globalConditionInput.trim(),
+      }
+      setGlobalConditions([...globalConditions, newCondition])
+      setGlobalConditionInput("")
+    }
   }
 
-  // 전역 알림 조건 삭제
-  const handleRemoveGlobalCondition = () => {
-    setGlobalCondition(undefined)
-    setShowGlobalModal(false)
-    setGlobalConditionInput("")
+  // 전역 키워드 삭제
+  const handleRemoveGlobalCondition = (id: string) => {
+    setGlobalConditions(globalConditions.filter((c) => c.id !== id))
   }
 
   // 여러 조건 동시 매칭 확인 함수 (LLM 사용)
@@ -329,11 +331,13 @@ export function ChatDemo() {
       })
     }
 
-    if (globalCondition) {
-      conditionsToCheck.push({
-        id: "global",
-        condition: globalCondition,
-        sensitivity: globalSensitivity,
+    if (globalNotificationEnabled && globalConditions.length > 0) {
+      globalConditions.forEach((cond, idx) => {
+        conditionsToCheck.push({
+          id: `global-${cond.id}`,
+          condition: cond.condition,
+          sensitivity: globalSensitivity,
+        })
       })
     }
 
@@ -450,6 +454,7 @@ export function ChatDemo() {
 
   const handleBackToList = () => {
     setRightPhoneScreen("list")
+    setShowGlobalModal(false)
   }
 
   useEffect(() => {
@@ -498,101 +503,6 @@ export function ChatDemo() {
               onNotificationSettings={handleNotificationSettings}
               onGlobalNotificationSettings={handleGlobalNotificationSettings}
             />
-            {/* 전역 알림 조건 설정 모달 */}
-            {showGlobalModal && (
-              <div
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
-                onClick={() => setShowGlobalModal(false)}
-              >
-                <div
-                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[320px] w-[90%] max-h-[90%] overflow-y-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h2 className="text-base font-bold text-foreground mb-1">전역 알림 조건 설정</h2>
-                  <p className="text-xs text-muted-foreground mb-3">모든 채팅방에 기본으로 적용됩니다</p>
-
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-foreground mb-1">
-                      언제 알림을 받고 싶으신가요?
-                    </label>
-                    <textarea
-                      value={globalConditionInput}
-                      onChange={(e) => setGlobalConditionInput(e.target.value)}
-                      placeholder='예: "여행 예약과 관련된 얘기가 나올 때 알려줘"'
-                      className="w-full px-2 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={3}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      개별 채팅방에 조건이 설정되어 있으면 그 조건이 우선 적용됩니다.
-                    </p>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-foreground mb-1">반응 민감도</label>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setGlobalSensitivityInput("high")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          globalSensitivityInput === "high"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        높음
-                      </button>
-                      <button
-                        onClick={() => setGlobalSensitivityInput("medium")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          globalSensitivityInput === "medium"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        중간
-                      </button>
-                      <button
-                        onClick={() => setGlobalSensitivityInput("low")}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-                          globalSensitivityInput === "low"
-                            ? "bg-blue-500 text-white"
-                            : "bg-muted text-foreground hover:bg-muted/70"
-                        }`}
-                      >
-                        낮음
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {globalSensitivityInput === "high" && "조금이라도 관련되면 알림"}
-                      {globalSensitivityInput === "medium" && "명확하게 관련되면 알림"}
-                      {globalSensitivityInput === "low" && "매우 직접적으로 관련될 때만 알림"}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-1.5 justify-end">
-                    {globalCondition && (
-                      <button
-                        onClick={handleRemoveGlobalCondition}
-                        className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                      >
-                        조건 삭제
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowGlobalModal(false)}
-                      className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 rounded-lg transition-colors"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={handleSaveGlobalCondition}
-                      className="px-3 py-1.5 text-xs bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors"
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* 알림 조건 설정 모달 */}
             {showConditionModal && (
@@ -703,6 +613,153 @@ export function ChatDemo() {
               showBackButton={true}
               onBack={handleBackToList}
             />
+          </div>
+        )
+      case "global-settings":
+        return (
+          <div className="h-full flex flex-col bg-background">
+            {/* 헤더 */}
+            <div className="bg-card px-4 py-3 flex items-center border-b border-border">
+              <button onClick={handleBackToList} className="mr-3">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="font-bold text-foreground">관심사 알림 설정</span>
+            </div>
+
+            {/* 내용 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* 관심사 알림 이용하기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">관심사 알림 이용하기</span>
+                  <button
+                    onClick={() => setGlobalNotificationEnabled(!globalNotificationEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      globalNotificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        globalNotificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  등록된 관심사에 관련된 대화가 이루어지면 채팅방 알림이 꺼져 있어도 푸시 알림을 받게됩니다.
+                </p>
+              </div>
+
+              {/* 알림 발생 민감도 */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium text-foreground">알림 발생 민감도</span>
+                <p className="text-xs text-muted-foreground">민감도가 낮을수록 관련도가 높은 대화일때만 알림을 보내요</p>
+                <div className="flex items-center gap-3 mt-4">
+                  <span className="text-xs text-muted-foreground">낮음</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    value={globalSensitivity === "low" ? 0 : globalSensitivity === "medium" ? 1 : 2}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setGlobalSensitivity(val === 0 ? "low" : val === 1 ? "medium" : "high")
+                    }}
+                    className="flex-1 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-400"
+                  />
+                  <span className="text-xs text-muted-foreground">높음</span>
+                </div>
+              </div>
+
+              {/* 관심사 리스트 */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">관심사 ({globalConditions.length}/20)</span>
+                  <button
+                    onClick={() => setShowGlobalModal(true)}
+                    className="px-3 py-1 text-xs border border-border rounded-full text-foreground hover:bg-muted"
+                  >
+                    추가
+                  </button>
+                </div>
+
+                {/* 키워드 목록 */}
+                <div className="space-y-2">
+                  {globalConditions.map((cond) => (
+                    <div
+                      key={cond.id}
+                      className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg"
+                    >
+                      <span className="text-sm text-foreground">{cond.condition}</span>
+                      <button
+                        onClick={() => handleRemoveGlobalCondition(cond.id)}
+                        className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white hover:bg-gray-500"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {globalConditions.length === 0 && (
+                    <p className="text-center text-xs text-muted-foreground py-4">
+                      추가 버튼을 눌러 관심사를 등록해보세요
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 키워드 추가 모달 */}
+            {showGlobalModal && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50"
+                onClick={() => setShowGlobalModal(false)}
+              >
+                <div
+                  className="bg-card border border-border rounded-lg shadow-xl p-4 max-w-[300px] w-[90%]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-base font-bold text-foreground mb-3">관심사 추가</h3>
+                  <input
+                    type="text"
+                    value={globalConditionInput}
+                    onChange={(e) => setGlobalConditionInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddGlobalCondition()
+                        setShowGlobalModal(false)
+                      }
+                    }}
+                    placeholder="예) 여행 관련 애기"
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex gap-2 justify-end mt-4">
+                    <button
+                      onClick={() => {
+                        setShowGlobalModal(false)
+                        setGlobalConditionInput("")
+                      }}
+                      className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50 rounded-lg"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleAddGlobalCondition()
+                        setShowGlobalModal(false)
+                      }}
+                      className="px-4 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-lg"
+                    >
+                      추가
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
     }
