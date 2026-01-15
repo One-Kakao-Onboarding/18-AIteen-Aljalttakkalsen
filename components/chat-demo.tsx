@@ -20,6 +20,7 @@ interface Notification {
   message: string
   chatName: string
   timestamp: Date
+  keyword?: string // 볼드 처리할 키워드
 }
 
 type NotificationSensitivity = "high" | "medium" | "low"
@@ -32,6 +33,7 @@ interface ChatRoom {
   avatar: string
   time: string
   notificationEnabled: boolean
+  keywordNotificationEnabled: boolean
   notificationConditions: Array<{ id: string; condition: string }>
   notificationSensitivity: NotificationSensitivity
   notifiedTopics: string[]
@@ -54,6 +56,7 @@ export function ChatDemo() {
   const [globalConditions, setGlobalConditions] = useState<Array<{ id: string; condition: string }>>([])
   const [globalSensitivity, setGlobalSensitivity] = useState<NotificationSensitivity>("medium")
   const [globalNotificationEnabled, setGlobalNotificationEnabled] = useState(false)
+  const [globalAllNotificationEnabled, setGlobalAllNotificationEnabled] = useState(true)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
     {
       id: "main",
@@ -63,6 +66,7 @@ export function ChatDemo() {
       avatar: "👤",
       time: "방금",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -75,6 +79,7 @@ export function ChatDemo() {
       avatar: "👨‍👩‍👧‍👦",
       time: "오후 2:30",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -87,6 +92,7 @@ export function ChatDemo() {
       avatar: "🧑",
       time: "오후 1:15",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -99,6 +105,7 @@ export function ChatDemo() {
       avatar: "💼",
       time: "오전 11:00",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -111,6 +118,7 @@ export function ChatDemo() {
       avatar: "👩",
       time: "어제",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -123,6 +131,7 @@ export function ChatDemo() {
       avatar: "🧔",
       time: "어제",
       notificationEnabled: true,
+      keywordNotificationEnabled: false,
       notificationConditions: [],
       notificationSensitivity: "medium",
       notifiedTopics: [],
@@ -137,6 +146,15 @@ export function ChatDemo() {
   const handleToggleNotification = (chatId: string) => {
     setChatRooms((prev) =>
       prev.map((room) => (room.id === chatId ? { ...room, notificationEnabled: !room.notificationEnabled } : room))
+    )
+  }
+
+  // 키워드 알림 토글 핸들러
+  const handleToggleKeywordNotification = (chatId: string) => {
+    setChatRooms((prev) =>
+      prev.map((room) =>
+        room.id === chatId ? { ...room, keywordNotificationEnabled: !room.keywordNotificationEnabled } : room
+      )
     )
   }
 
@@ -298,7 +316,7 @@ export function ChatDemo() {
     )
 
     // 1. 일반 메시지 알림 (알림이 켜져있을 때만)
-    if (mainChatRoom?.notificationEnabled) {
+    if (globalAllNotificationEnabled && mainChatRoom?.notificationEnabled) {
       const generalNotification: Notification = {
         id: Date.now().toString(),
         message: text,
@@ -318,7 +336,7 @@ export function ChatDemo() {
       notificationTimeoutsRef.current.set(generalNotification.id, generalTimeoutId)
     }
 
-    // 2. 키워드 알림 (알림 on/off 여부와 관계없이 키워드 조건이 있으면 체크)
+    // 2. 키워드 알림 (키워드 알림이 켜져있고 조건이 있으면 체크)
     // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
     const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
     const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
@@ -326,7 +344,7 @@ export function ChatDemo() {
     // 개별 조건과 전역 조건을 배열로 모음
     const conditionsToCheck: Array<{ id: string; condition: string; sensitivity: NotificationSensitivity }> = []
 
-    if (mainChatRoom && mainChatRoom.notificationConditions.length > 0) {
+    if (mainChatRoom?.keywordNotificationEnabled && mainChatRoom.notificationConditions.length > 0) {
       mainChatRoom.notificationConditions.forEach((cond) => {
         conditionsToCheck.push({
           id: `individual-${cond.id}`,
@@ -374,6 +392,7 @@ export function ChatDemo() {
           message: `${topicsText} 관련 이야기가 나오고 있어요!`,
           chatName: mainChatRoom?.name || "메시지",
           timestamp: new Date(),
+          keyword: topicsText,
         }
 
         setNotifications((prev) => [keywordNotification, ...prev])
@@ -495,6 +514,7 @@ export function ChatDemo() {
                   key={notification.id}
                   message={notification.message}
                   chatName={notification.chatName}
+                  keyword={notification.keyword}
                   onClick={() => handleNotificationClick(notification.id)}
                 />
               ))}
@@ -549,6 +569,27 @@ export function ChatDemo() {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">이 채팅방의 메시지에 대한 알림을 받습니다.</p>
+              </div>
+
+              {/* 키워드 알림 켜기/끄기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">키워드 알림 받기
+                  </span>
+                  <button
+                    onClick={() => handleToggleKeywordNotification(selectedChatId!)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      selectedRoom?.keywordNotificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        selectedRoom?.keywordNotificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">등록한 관심사 키워드에 대한 알림을 받습니다.</p>
               </div>
 
               {/* 알림 발생 민감도 */}
@@ -694,11 +735,33 @@ export function ChatDemo() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="font-bold text-foreground">관심사 알림 설정</span>
+              <span className="font-bold text-foreground">알림 설정</span>
             </div>
 
             {/* 내용 */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* 전체 알림 켜기/끄기 토글 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">전체 알림 받기</span>
+                  <button
+                    onClick={() => setGlobalAllNotificationEnabled(!globalAllNotificationEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      globalAllNotificationEnabled ? "bg-yellow-400" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        globalAllNotificationEnabled ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  모든 채팅방의 알림을 일괄적으로 켜거나 끕니다.
+                </p>
+              </div>
+
               {/* 관심사 알림 이용하기 토글 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

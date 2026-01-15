@@ -4,9 +4,29 @@ interface NotificationBannerProps {
   message: string
   chatName?: string
   onClick: () => void
+  keyword?: string
 }
 
-export function NotificationBanner({ message, chatName, onClick }: NotificationBannerProps) {
+export function NotificationBanner({ message, chatName, onClick, keyword }: NotificationBannerProps) {
+  // 키워드가 있으면 메시지에서 키워드를 찾아 볼드 처리
+  const renderMessage = () => {
+    if (!keyword) {
+      return <p className="text-xs text-muted-foreground truncate mt-0.5">{message}</p>
+    }
+
+    const parts = message.split(keyword)
+    return (
+      <p className="text-xs text-muted-foreground truncate mt-0.5">
+        {parts.map((part, index) => (
+          <span key={index}>
+            {part}
+            {index < parts.length - 1 && <span className="font-bold">{keyword}</span>}
+          </span>
+        ))}
+      </p>
+    )
+  }
+
   return (
     <button
       onClick={onClick}
@@ -22,7 +42,7 @@ export function NotificationBanner({ message, chatName, onClick }: NotificationB
           <span className="text-xs font-semibold text-foreground">{chatName || "메시지"}</span>
           <span className="text-[10px] text-muted-foreground">지금</span>
         </div>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{message}</p>
+        {renderMessage()}
       </div>
     </button>
   )
