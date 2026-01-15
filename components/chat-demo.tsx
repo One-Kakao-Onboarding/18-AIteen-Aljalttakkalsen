@@ -293,12 +293,15 @@ export function ChatDemo() {
   }
 
   const sendMessage = async (text: string) => {
+    // 오른쪽 휴대폰이 채팅방에 있으면 바로 읽음 처리
+    const isInChatRoom = rightPhoneScreen === "chat"
+
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
       sender: "other",
       timestamp: new Date(),
-      read: false,
+      read: isInChatRoom,
     }
     setMessages((prev) => [...prev, newMessage])
 
@@ -309,7 +312,7 @@ export function ChatDemo() {
           ? {
               ...room,
               lastMessage: text,
-              unreadCount: messages.filter((msg) => msg.sender === "other" && !msg.read).length + 1,
+              unreadCount: isInChatRoom ? 0 : messages.filter((msg) => msg.sender === "other" && !msg.read).length + 1,
             }
           : room
       )
