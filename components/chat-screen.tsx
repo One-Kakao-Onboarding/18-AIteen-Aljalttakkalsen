@@ -31,8 +31,9 @@ export function ChatScreen({ messages, onSendMessage, isMe, onBack, showBackButt
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (inputValue.trim()) {
-      await onSendMessage(inputValue.trim())
+      const messageText = inputValue.trim()
       setInputValue("")
+      onSendMessage(messageText)
     }
   }
 
