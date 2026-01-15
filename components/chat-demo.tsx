@@ -198,13 +198,12 @@ export function ChatDemo() {
     setGlobalConditionInput("")
   }
 
-  // 조건 매칭 확인 함수 (LLM 사용)
-  const checkConditionMatch = async (
+  // 여러 조건 동시 매칭 확인 함수 (LLM 사용)
+  const checkMultipleConditions = async (
     message: string,
-    condition?: string,
-    sensitivity: NotificationSensitivity = "medium"
-  ): Promise<{ shouldNotify: boolean; topic: string }> => {
-    if (!condition) return { shouldNotify: true, topic: "" } // 조건이 없으면 항상 알림
+    conditions: Array<{ id: string; condition: string; sensitivity: NotificationSensitivity }>
+  ): Promise<Array<{ conditionId: string; shouldNotify: boolean; topic: string }>> => {
+    if (conditions.length === 0) return []
 
     try {
       const response = await fetch("/api/check-notification", {
@@ -212,19 +211,22 @@ export function ChatDemo() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message, condition, sensitivity }),
+        body: JSON.stringify({
+          message,
+          conditions: conditions.map((c) => ({ id: c.id, condition: c.condition, sensitivity: c.sensitivity })),
+        }),
       })
 
       if (!response.ok) {
-        console.error("Failed to check notification condition")
-        return { shouldNotify: true, topic: "" } // API 실패 시 기본적으로 알림 허용
+        console.error("Failed to check notification conditions")
+        return []
       }
 
       const data = await response.json()
-      return { shouldNotify: data.shouldNotify, topic: data.topic || "" }
+      return data.results || []
     } catch (error) {
-      console.error("Error checking notification condition:", error)
-      return { shouldNotify: true, topic: "" } // 에러 시 기본적으로 알림 허용
+      console.error("Error checking notification conditions:", error)
+      return []
     }
   }
 
@@ -312,50 +314,75 @@ export function ChatDemo() {
     }
 
     // 2. 키워드 알림 (알림 on/off 여부와 관계없이 키워드 조건이 있으면 체크)
-    const conditionToUse = mainChatRoom?.notificationCondition || globalCondition
-    const sensitivityToUse = mainChatRoom?.notificationCondition
-      ? mainChatRoom.notificationSensitivity
-      : globalSensitivity
+    // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
+    const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
+    const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
 
-    if (conditionToUse) {
-      // 읽지 않은 메시지 전체를 합침 (새 메시지 포함)
-      const unreadMessages = messages.filter((msg) => msg.sender === "other" && !msg.read)
-      const allUnreadText = [...unreadMessages.map((msg) => msg.text), text].join(" ")
+    // 개별 조건과 전역 조건을 배열로 모음
+    const conditionsToCheck: Array<{ id: string; condition: string; sensitivity: NotificationSensitivity }> = []
 
-      console.log("Checking unread messages for keyword:", allUnreadText)
+    if (mainChatRoom?.notificationCondition) {
+      conditionsToCheck.push({
+        id: "individual",
+        condition: mainChatRoom.notificationCondition,
+        sensitivity: mainChatRoom.notificationSensitivity,
+      })
+    }
 
-      const result = await checkConditionMatch(allUnreadText, conditionToUse, sensitivityToUse)
+    if (globalCondition) {
+      conditionsToCheck.push({
+        id: "global",
+        condition: globalCondition,
+        sensitivity: globalSensitivity,
+      })
+    }
 
-      if (result.shouldNotify && result.topic) {
-        // 이미 알림이 간 토픽인지 확인
-        const alreadyNotified = mainChatRoom?.notifiedTopics.includes(result.topic)
+    // 조건이 있으면 한 번에 검사
+    if (conditionsToCheck.length > 0) {
+      console.log("Checking keywords:", allUnreadText, "conditions:", conditionsToCheck)
 
-        if (!alreadyNotified) {
-          // 키워드 알림 생성
-          const keywordNotification: Notification = {
-            id: (Date.now() + 1).toString(), // ID 충돌 방지
-            message: `${result.topic} 관련 이야기가 나오고 있어요!`,
-            timestamp: new Date(),
+      const results = await checkMultipleConditions(allUnreadText, conditionsToCheck)
+
+      // 매칭된 토픽들을 수집
+      const matchedTopics: string[] = []
+
+      for (const result of results) {
+        if (result.shouldNotify && result.topic) {
+          // 이미 알림이 간 토픽인지 확인
+          const alreadyNotified = mainChatRoom?.notifiedTopics.includes(result.topic)
+
+          if (!alreadyNotified) {
+            matchedTopics.push(result.topic)
           }
-
-          setNotifications((prev) => [keywordNotification, ...prev])
-          playNotificationSound()
-
-          // 토픽을 notifiedTopics에 추가
-          setChatRooms((prev) =>
-            prev.map((room) =>
-              room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, result.topic] } : room
-            )
-          )
-
-          // 4초 후 키워드 알림 자동 제거
-          const keywordTimeoutId = setTimeout(() => {
-            setNotifications((prev) => prev.filter((n) => n.id !== keywordNotification.id))
-            notificationTimeoutsRef.current.delete(keywordNotification.id)
-          }, 4000)
-
-          notificationTimeoutsRef.current.set(keywordNotification.id, keywordTimeoutId)
         }
+      }
+
+      // 매칭된 토픽이 있으면 하나의 알림으로 표시
+      if (matchedTopics.length > 0) {
+        const topicsText = matchedTopics.join(", ")
+        const keywordNotification: Notification = {
+          id: `${Date.now()}-keywords`,
+          message: `${topicsText} 관련 이야기가 나오고 있어요!`,
+          timestamp: new Date(),
+        }
+
+        setNotifications((prev) => [keywordNotification, ...prev])
+        playNotificationSound()
+
+        // 모든 토픽을 notifiedTopics에 추가
+        setChatRooms((prev) =>
+          prev.map((room) =>
+            room.id === "main" ? { ...room, notifiedTopics: [...room.notifiedTopics, ...matchedTopics] } : room
+          )
+        )
+
+        // 4초 후 알림 자동 제거
+        const timeoutId = setTimeout(() => {
+          setNotifications((prev) => prev.filter((n) => n.id !== keywordNotification.id))
+          notificationTimeoutsRef.current.delete(keywordNotification.id)
+        }, 4000)
+
+        notificationTimeoutsRef.current.set(keywordNotification.id, timeoutId)
       }
     }
   }
